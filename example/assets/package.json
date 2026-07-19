@@ -1,0 +1,19 @@
+{
+  "name": "example_assets",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "node builder.js -m dev -w",
+    "prod": "node builder.js -m prod"
+  },
+  "dependencies": {
+    "@keenmate/phoenix_svelte": "file:../../keen_phoenix_svelte"
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "^4.0.0",
+    "cross-env": "^7.0.3",
+    "svelte": "^5.0.0",
+    "vite": "^5.4.0",
+    "yargs": "^17.7.2"
+  }
+}

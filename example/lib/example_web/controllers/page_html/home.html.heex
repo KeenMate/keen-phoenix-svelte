@@ -1,0 +1,20 @@
+<Layouts.flash_group flash={@flash} />
+<div class="mx-auto max-w-3xl p-8">
+  <h1 class="text-2xl font-bold mb-2">Plain (non-LiveView) page</h1>
+  <p class="text-sm text-gray-500 mb-6">
+    The same <code>like</code> app, mounted here by <code>mountStatic()</code> (no
+    LiveView on this page). It has no <code>live</code> bridge, so it talks to the
+    server over REST via the <code>api</code> helper (CSRF + session).
+  </p>
+
+  <div class="grid grid-cols-3 gap-4">
+    <div :for={id <- 1..6} class="rounded-lg border p-4 text-center">
+      <div class="text-sm text-gray-500 mb-3">Item #{id}</div>
+      <.svelte name="like" id={"like-#{id}"} props={%{id: id, liked: false}} />
+    </div>
+  </div>
+
+  <p class="text-sm text-gray-500 mt-6">
+    Compare with the LiveView version at <.link navigate={~p"/"} class="underline">/</.link>.
+  </p>
+</div>

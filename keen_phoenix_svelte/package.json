@@ -1,0 +1,32 @@
+{
+  "name": "@keenmate/phoenix_svelte",
+  "version": "1.0.0-rc01",
+  "description": "Auto-mount compiled Svelte components into Phoenix LiveView (hook + AppsManager).",
+  "type": "module",
+  "main": "assets/js/keen_phoenix_svelte/index.js",
+  "module": "assets/js/keen_phoenix_svelte/index.js",
+  "exports": {
+    ".": "./assets/js/keen_phoenix_svelte/index.js",
+    "./vite": "./assets/vite/config.js"
+  },
+  "files": [
+    "assets"
+  ],
+  "peerDependencies": {
+    "phoenix": "^1.7.0 || ^1.8.0",
+    "svelte": "^4.0.0 || ^5.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@sveltejs/vite-plugin-svelte": {
+      "optional": true
+    },
+    "svelte-preprocess": {
+      "optional": true
+    }
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/keenmate/keen_phoenix_svelte"
+  }
+}

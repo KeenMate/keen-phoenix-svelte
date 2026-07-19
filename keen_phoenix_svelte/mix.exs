@@ -1,0 +1,61 @@
+defmodule KeenPhoenixSvelte.MixProject do
+  use Mix.Project
+
+  @version "1.0.0-rc.1"
+  @source_url "https://github.com/keenmate/keen_phoenix_svelte"
+
+  def project do
+    [
+      app: :keen_phoenix_svelte,
+      version: @version,
+      elixir: "~> 1.15",
+      elixirc_paths: ["lib"],
+      start_permanent: Mix.env() == :prod,
+      deps: deps(),
+      description:
+        "Auto-mount compiled Svelte components into Phoenix LiveView via a hook + function component.",
+      package: package(),
+      name: "KeenPhoenixSvelte",
+      source_url: @source_url,
+      docs: docs()
+    ]
+  end
+
+  def application do
+    [extra_applications: [:logger]]
+  end
+
+  defp deps do
+    [
+      {:phoenix_live_view, "~> 1.0"},
+      {:jason, "~> 1.2"},
+      {:ex_doc, "~> 0.31", only: :dev, runtime: false}
+    ]
+  end
+
+  defp package do
+    [
+      maintainers: ["KeenMate"],
+      licenses: ["MIT"],
+      files: ~w(lib assets docs package.json mix.exs README.md CHANGELOG.md LICENSE .formatter.exs),
+      links: %{"GitHub" => @source_url}
+    ]
+  end
+
+  defp docs do
+    [
+      main: "readme",
+      source_ref: "v#{@version}",
+      extras: [
+        "README.md",
+        "docs/philosophy.md": [title: "Philosophy & comparison"],
+        "docs/installation.md": [title: "Installation & setup"],
+        "docs/authoring-apps.md": [title: "Authoring apps"],
+        "docs/server-communication.md": [title: "Server communication"],
+        "docs/multiple-apps.md": [title: "Worked example: multiple apps"],
+        "CHANGELOG.md": [title: "Changelog"]
+      ],
+      groups_for_extras: [Guides: ~r{docs/}]
+    ]
+  end
+end

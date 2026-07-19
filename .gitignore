@@ -1,0 +1,9 @@
+# Machine-local Claude settings (the shared .claude/commands/ stay tracked)
+.claude/settings.local.json
+
+# Built Svelte app bundles in the example (produced by the asset build)
+/example/priv/static/apps/
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
