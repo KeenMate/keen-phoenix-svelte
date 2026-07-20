@@ -8,9 +8,11 @@ defmodule ExampleWeb.Router do
     plug :put_root_layout, html: {ExampleWeb.Layouts, :root}
     plug :protect_from_forgery
     plug :put_secure_browser_headers
+    plug ExampleWeb.Plugs.CurrentUser
+    plug ExampleWeb.Plugs.Locale
   end
 
-  # JSON API for same-origin calls from Svelte apps: session + CSRF, no bearer
+  # JSON API for same-origin calls from Svelte islands: session + CSRF, no bearer
   # token. Matches what the client `api` helper sends.
   pipeline :browser_api do
     plug :accepts, ["json"]
@@ -18,31 +20,50 @@ defmodule ExampleWeb.Router do
     plug :protect_from_forgery
   end
 
+  # Simulates a *different* service (Microsoft Graph): a bearer token only, no
+  # session or CSRF. See `ExampleWeb.Plugs.RequireGraphToken`.
+  pipeline :graph_api do
+    plug :accepts, ["json"]
+    plug ExampleWeb.Plugs.RequireGraphToken
+  end
+
   scope "/", ExampleWeb do
     pipe_through :browser
 
-    live "/", DemoLive, :index
-    get "/plain", PageController, :home
+    live_session :workspace, on_mount: ExampleWeb.CurrentUserHook do
+      live "/", HomeLive, :index
+      live "/chat", ChatLive, :index
+      live "/videos", VideosLive, :index
+      live "/calendar", CalendarLive, :index
+    end
+
+    # Plain (non-LiveView) page — the calendar island mounts via mountStatic().
+    get "/calendar-plain", PageController, :calendar_plain
+
+    # Demo-only identity switch (not authentication).
+    post "/session/switch", SessionController, :switch
+    # Language switch — stores the locale in the session.
+    post "/session/locale", SessionController, :locale
   end
 
   scope "/api", ExampleWeb do
     pipe_through :browser_api
 
-    post "/like", ApiController, :like
+    get "/videos", VideoController, :index
+    get "/videos/:id", VideoController, :show
+    post "/videos/:id/save", VideoController, :save
   end
 
-  # Other scopes may use custom stacks.
-  # scope "/api", ExampleWeb do
-  #   pipe_through :api
-  # end
+  # Mock Microsoft Graph. In a real app the calendar island would call
+  # https://graph.microsoft.com/v1.0/... instead of this same-origin stand-in.
+  scope "/mock-graph", ExampleWeb do
+    pipe_through :graph_api
+
+    get "/v1.0/me/calendarView", MockGraphController, :calendar_view
+  end
 
   # Enable LiveDashboard in development
   if Application.compile_env(:example, :dev_routes) do
-    # If you want to use the LiveDashboard in production, you should put
-    # it behind authentication and allow only admins to access it.
-    # If your application does not have an admins-only section yet,
-    # you can use Plug.BasicAuth to set up some basic authentication
-    # as long as you are also using SSL (which you should anyway).
     import Phoenix.LiveDashboard.Router
 
     scope "/dev" do

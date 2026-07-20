@@ -1,12 +1,12 @@
 defmodule ExampleWeb.PageControllerTest do
-  use ExampleWeb.ConnCase
+  use ExampleWeb.ConnCase, async: true
 
-  test "GET /plain renders a static page that mounts a Svelte app", %{conn: conn} do
-    conn = get(conn, ~p"/plain")
-    html = html_response(conn, 200)
-    assert html =~ "Plain (non-LiveView) page"
-    # the <.svelte> mount point + the once-per-page runtime context
-    assert html =~ ~s(data-app="like")
+  test "GET /calendar-plain renders a plain page that mounts the calendar island", %{conn: conn} do
+    html = conn |> get(~p"/calendar-plain") |> html_response(200)
+
+    assert html =~ "plain controller-rendered page"
+    # the <.svelte> mount point + the once-per-page runtime context (with a token)
+    assert html =~ ~s(data-app="calendar")
     assert html =~ ~s(id="keen-context")
   end
 end

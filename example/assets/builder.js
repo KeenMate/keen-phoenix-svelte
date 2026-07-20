@@ -33,7 +33,9 @@ async function discoverApps() {
 }
 
 function buildCommand(name, { mode, watch }) {
-  let cmd = `cross-env SVELTE_APP=${name} vite build --mode ${mode} --config apps.vite.config.mjs`;
+  // SVELTE_APP is passed via the child's env (see runAll) rather than cross-env,
+  // so this works when launched by the Phoenix watcher (not just `npm run`).
+  let cmd = `vite build --mode ${mode} --config apps.vite.config.mjs`;
   if (watch) cmd += " --watch";
   return { name, cmd };
 }
@@ -46,9 +48,16 @@ function stream(name, data) {
 }
 
 function runAll(scripts) {
+  // Put node_modules/.bin on PATH so `vite` resolves even when this script is
+  // launched outside `npm run` (e.g. by the Phoenix dev watcher), which does not
+  // add .bin to PATH the way npm does.
+  const binDir = path.resolve(__dirname, "node_modules", ".bin");
+  const withBin = `${binDir}${path.delimiter}${process.env.PATH || ""}`;
+
   scripts.forEach((script) => {
     console.log("building " + script.name);
-    const child = exec(script.cmd, { cwd: __dirname });
+    const env = { ...process.env, PATH: withBin, SVELTE_APP: script.name };
+    const child = exec(script.cmd, { cwd: __dirname, env });
     child.stdout.on("data", (d) => stream(script.name, d));
     child.stderr.on("data", (d) => stream(script.name, d));
   });

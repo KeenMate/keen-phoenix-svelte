@@ -11,8 +11,9 @@ defmodule Example.Application do
       ExampleWeb.Telemetry,
       {DNSCluster, query: Application.get_env(:example, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: Example.PubSub},
-      # Start a worker by calling: Example.Worker.start_link(arg)
-      # {Example.Worker, arg},
+      # Presence for chat "who's online"; Chat holds the in-memory message store.
+      ExampleWeb.Presence,
+      Example.Chat,
       # Start to serve requests, typically the last entry
       ExampleWeb.Endpoint
     ]

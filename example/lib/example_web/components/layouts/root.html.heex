@@ -6,11 +6,27 @@
     <meta name="csrf-token" content={get_csrf_token()} />
     <KeenPhoenixSvelte.runtime context={
       %{
-        user: %{id: 1, name: "Demo User", roles: ["member"]},
+        user: %{
+          id: @current_user.id,
+          name: @current_user.name,
+          title: @current_user.title,
+          email: @current_user.email,
+          color: @current_user.color
+        },
         csrf_token: get_csrf_token(),
         api_base: "/api",
         socket_path: "/socket",
-        socket_token: Phoenix.Token.sign(ExampleWeb.Endpoint, "user socket", 1)
+        # Page-wide UI language. Islands localize themselves from this — the
+        # server sends the *locale*, never translated strings (see Example.I18n).
+        locale: @locale,
+        # Authenticates the Phoenix channel socket (chat).
+        socket_token: Phoenix.Token.sign(ExampleWeb.Endpoint, "user socket", @current_user.id),
+        # Simulated Microsoft Entra / Graph access token for the calendar island —
+        # a short-lived, per-user token the app sends as a bearer to the mock Graph
+        # service. In a real app this is an on-behalf-of token for graph.microsoft.com.
+        tokens: %{
+          graph: Phoenix.Token.sign(ExampleWeb.Endpoint, "graph token", @current_user.id)
+        }
       }
     } />
     <.live_title default="Example" suffix=" · Phoenix Framework">

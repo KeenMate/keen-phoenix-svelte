@@ -1,7 +1,8 @@
 defmodule ExampleWeb.UserSocket do
   use Phoenix.Socket
 
-  channel "demo:*", ExampleWeb.DemoChannel
+  channel "chat:*", ExampleWeb.ChatChannel
+  channel "meeting:*", ExampleWeb.MeetingChannel
 
   # Authenticated with the signed token that keen_phoenix_svelte delivers in the
   # runtime context (context.socket_token) and sends as a connect param.

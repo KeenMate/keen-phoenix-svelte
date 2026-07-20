@@ -19,7 +19,8 @@ NPM_VERSION := $(shell grep -E '"version"\s*:' $(LIB)/package.json | head -1 | s
         hex-deps hex-compile hex-build-docs hex-docs hex-build hex-build-inspect \
         hex-publish-dry hex-publish-rc hex-publish \
         npm-pack npm-publish-rc npm-publish \
-        current-version last-published
+        current-version last-published \
+        container-build container-run container-shell container-push
 
 help:
 	@echo "keen_phoenix_svelte — Hex $(HEX_VERSION) / npm $(NPM_VERSION)"
@@ -45,6 +46,12 @@ help:
 	@echo "  hex-publish       Publish a stable to Hex (refuses if @version is an rc)"
 	@echo "  npm-publish-rc    npm publish --tag rc (refuses unless version is a pre-release)"
 	@echo "  npm-publish       npm publish (refuses if version is a pre-release)"
+	@echo ""
+	@echo "Demo container (example app → keen-phoenix-svelte.keenmate.dev):"
+	@echo "  container-build   Build the example app image (context = repo root)"
+	@echo "  container-run     Build + run on http://localhost:$(HOST_PORT)"
+	@echo "  container-shell   Open a shell in the built image"
+	@echo "  container-push    Tag + push to IMAGE_REMOTE"
 
 # ---------------------------------------------------------------------------
 # Example app (Phoenix demo)
@@ -192,3 +199,39 @@ npm-publish: ## npm publish (refuses if version is a pre-release)
 	@read _
 	cd $(LIB) && npm publish --access public
 	@echo "Published $(NPM_PKG)@$(NPM_VERSION) (stable)."
+
+# ---------------------------------------------------------------------------
+# Demo container — the example app ("KeenSpace"), for deploying to
+# keen-phoenix-svelte.keenmate.dev.
+#
+# Build context is the repo ROOT (not example/) because the example pulls the
+# library via `path:` / npm `file:` and needs both dirs visible. CONTAINER
+# defaults to podman; override for docker: `make container-run CONTAINER=docker`.
+# SECRET_KEY_BASE is generated fresh per run (never baked in). PORT/PHX_HOST
+# default inside the image.
+# ---------------------------------------------------------------------------
+
+CONTAINER    ?= podman
+IMAGE        ?= keen-phoenix-svelte-example
+HOST_PORT    ?= 4070
+# Registry target for container-push, e.g. registry.keenmate.dev/keen-phoenix-svelte-example:prod
+IMAGE_REMOTE ?=
+
+container-build: ## Build the example app image (context = repo root)
+	$(CONTAINER) build -t $(IMAGE) .
+
+container-run: container-build ## Build then run on http://localhost:$(HOST_PORT)
+	@echo "Serving the demo on http://localhost:$(HOST_PORT)/ (Ctrl+C to stop) ..."
+	$(CONTAINER) run --rm -p $(HOST_PORT):4070 \
+		-e SECRET_KEY_BASE="$$(openssl rand -base64 48)" \
+		-e PHX_HOST=localhost \
+		-e CHECK_ORIGIN=false \
+		$(IMAGE)
+
+container-shell: container-build ## Open a shell in the built image (debugging)
+	$(CONTAINER) run --rm -it --entrypoint /bin/sh $(IMAGE)
+
+container-push: ## Tag + push the image to IMAGE_REMOTE (set IMAGE_REMOTE=registry/host:tag)
+	@test -n "$(IMAGE_REMOTE)" || { echo "ERROR: set IMAGE_REMOTE=registry.example.com/name:tag"; exit 1; }
+	$(CONTAINER) tag $(IMAGE) $(IMAGE_REMOTE)
+	$(CONTAINER) push $(IMAGE_REMOTE)

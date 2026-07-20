@@ -1,0 +1,41 @@
+<Layouts.workspace
+  current_user={@current_user}
+  active={:calendar}
+  title="Calendar (plain page)"
+  locale={@locale}
+  flash={@flash}
+>
+  <.svelte name="calendar" id="calendar-plain-app" props={%{}} />
+
+  <:aside>
+    <Layouts.info_panel title="Calendar — on a plain page">
+      <p>
+        This is a <strong>plain controller-rendered page</strong>
+        — no LiveView. The very same calendar island is mounted by <code>mountStatic()</code>
+        with <code>live: null</code>, and still works unchanged.
+      </p>
+      <p>
+        It never needed <code>live</code>: it reads <code>context.tokens.graph</code>
+        and calls the mock Graph service over its own <code>fetch</code>, and the
+        meeting chat opens over a <code>channel</code>
+        from the same context — so <strong>"Join online" works here too</strong>.
+      </p>
+      <:wire label="mountStatic">
+        Scans <code>[data-app]</code>
+        on dead pages and mounts each island with <code>live: null</code>.
+      </:wire>
+      <:wire label="context">
+        The runtime context is still emitted once in the page <code>&lt;head&gt;</code>.
+      </:wire>
+      <:wire label="fetch">
+        <code>GET /mock-graph/v1.0/me/calendarView</code>
+        with the bearer token — identical to the LiveView page.
+      </:wire>
+      <:wire label="channel">
+        Meeting chat joins <code>meeting:&lt;id&gt;</code>
+        over the page socket — no <code>live</code>
+        required.
+      </:wire>
+    </Layouts.info_panel>
+  </:aside>
+</Layouts.workspace>

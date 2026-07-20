@@ -1,0 +1,35 @@
+# Keep the build context small and reproducible. Everything the release needs
+# is fetched/compiled inside the image; host artifacts must not leak in.
+
+# Build artifacts (library + example) — rebuilt in the image.
+**/_build/
+**/deps/
+**/doc/
+erl_crash.dump
+*.ez
+*.tar
+keen_phoenix_svelte-*.tar
+
+# Node + generated assets — rebuilt by `mix assets.deploy` in the image. Note we
+# only ignore the *built* subdirs of priv/static, NOT source statics
+# (images/, favicon, robots.txt), which the release needs.
+**/node_modules/
+example/priv/static/assets/
+example/priv/static/apps/
+example/priv/static/cache_manifest.json
+
+# VCS / CI / tooling
+.git/
+.github/
+.claude/
+.elixir_ls/
+
+# Editor / OS
+.idea/
+.vscode/
+.DS_Store
+*.swp
+
+# The Docker files themselves
+Dockerfile
+.dockerignore
