@@ -1,10 +1,10 @@
 /**
  * Resolves and caches Svelte app bundles, then mounts them.
  *
- * Each app is a folder under `assets/apps/<name>/` whose `main.js` has a
- * default export `(target, props, live) => svelteInstance`. Bundles are built
- * to `priv/static/apps/<name>/main.mjs` and imported on demand — only the apps
- * actually present on a page are ever fetched.
+ * Each app is a folder under `assets/apps/<name>/` whose `main.js` has a default
+ * export `(target, { props, context, live, api, channel, bus, el }) => handle`.
+ * Bundles are built to `priv/static/apps/<name>/main.mjs` and imported on demand
+ * — only the apps actually present on a page are ever fetched.
  */
 export default class AppsManager {
   constructor(opts = {}) {
@@ -36,7 +36,7 @@ export default class AppsManager {
     if (typeof mount !== "function") {
       throw new Error(
         `[keen_phoenix_svelte] app "${name}" must have a default export ` +
-          `(target, { props, context, live, api }) => handle`
+          `(target, { props, context, live, api, channel, bus, el }) => handle`
       );
     }
 

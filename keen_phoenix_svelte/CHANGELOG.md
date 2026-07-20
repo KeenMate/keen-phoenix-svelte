@@ -5,6 +5,39 @@ All notable changes to `keen_phoenix_svelte` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+**Event bus — island-to-island messaging**
+- `bus` added to the app boundary: a page-wide, client-side pub/sub built on a DOM
+  `EventTarget`. `bus.emit(type, detail)`, `bus.on(type, handler)` and
+  `bus.once(type, handler)` (the latter two return an unsubscribe function, ideal
+  for a Svelte `$effect` cleanup). Lets independent islands on a page coordinate
+  **without the server and without importing each other**.
+- `getBus()` exported from the package and wired into **both** mount paths — the
+  `KeenSvelte` hook and `mountStatic()` — so the bus is present with or without
+  LiveView (unlike `live`, which is `null` on plain pages).
+- The mount boundary is now
+  `(target, { props, context, live, api, channel, bus, el }) => handle`.
+
+### Changed
+
+- **Example app reworked into "KeenSpace"** — a Teams-style workspace that doubles
+  as production-quality reference code:
+  - **Chat** over a Phoenix channel + `Presence`; clicking an avatar asks the host
+    LiveView to render a profile card beside the island.
+  - **Video catalogue** over the `api` REST helper with an in-page Plyr player and
+    the canonical `live`-or-`api` "save" fallback.
+  - **Calendar** from a simulated Microsoft Graph via `context.tokens` + its own
+    `fetch`; "Join online" opens a per-meeting chat over a `channel`.
+  - A bus-driven **activity toast** island, a **Welcome** page, a plain
+    (non-LiveView) route exercising `mountStatic()`, a user switcher, and a
+    simulated **i18n** (English / Spanish) with the locale delivered through
+    `context`.
+  - Deploy tooling: root `Dockerfile` + `.dockerignore`, `Makefile` `container-*`
+    targets, and a prod `runtime.exs`.
+
 ## [1.0.0-rc.1] - 2026-07-19 [PUBLISHED]
 
 Initial version. Auto-mounts compiled Svelte apps into Phoenix as self-contained
@@ -78,4 +111,5 @@ islands, on both LiveView and plain controller-rendered pages.
 - External-service token delivery (a server-minted token for a *different*
   service in `context.tokens.*`) — planned, not yet implemented.
 
+[Unreleased]: https://github.com/keenmate/keen_phoenix_svelte/compare/v1.0.0-rc.1...HEAD
 [1.0.0-rc.1]: https://github.com/keenmate/keen_phoenix_svelte/releases/tag/v1.0.0-rc.1

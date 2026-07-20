@@ -3,10 +3,12 @@
 // LiveView and plain controller-rendered pages.
 
 import { getChannelFactory } from "./channel";
+import { createBus } from "./bus";
 
 let _context;
 let _api;
 let _channel;
+let _bus;
 
 /** Reads the JSON emitted by `<KeenPhoenixSvelte.runtime context={...} />`. */
 export function getContext() {
@@ -70,6 +72,12 @@ export function getChannel() {
   return _channel;
 }
 
+/** The shared, page-wide event bus for island-to-island messaging. */
+export function getBus() {
+  if (!_bus) _bus = createBus();
+  return _bus;
+}
+
 function parseProps(el) {
   try {
     return JSON.parse(el.dataset.props || "{}");
@@ -97,6 +105,7 @@ export function mountStatic(appsManager, root = document) {
         live: null,
         api: getApi(),
         channel: getChannel(),
+        bus: getBus(),
         el,
       })
       .catch((err) => console.error(err));

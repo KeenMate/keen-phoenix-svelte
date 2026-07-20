@@ -3,11 +3,12 @@ import {
   getContext,
   getApi,
   getChannel,
+  getBus,
   mountStatic as mountStaticWith,
 } from "./runtime";
 
 export { AppsManager };
-export { getContext, getApi, getChannel } from "./runtime";
+export { getContext, getApi, getChannel, getBus } from "./runtime";
 
 // A single shared manager instance is enough for most apps.
 export const appsManager = new AppsManager();
@@ -79,6 +80,7 @@ export const KeenSvelte = {
         live: this.live,
         api: getApi(),
         channel: getChannel(),
+        bus: getBus(),
         el: this.el,
       })
       .then((instance) => {
