@@ -46,8 +46,9 @@ WORKDIR /src/example
 RUN mix deps.get --only prod
 RUN mix deps.compile
 
-# 2. Install the JS toolchain (tailwind + esbuild binaries, and `npm install`
-#    which links the library — a plain symlink works fine on Linux).
+# 2. Install the JS toolchain (tailwind + esbuild binaries, and `npm install
+#    --install-links`, which installs the local `file:` library as a real copy —
+#    matching dev, and sidestepping the Vite/Svelte-plugin realpath issue).
 RUN mix assets.setup
 
 # 3. Compile the app BEFORE building assets: the phoenix_live_view compiler emits
