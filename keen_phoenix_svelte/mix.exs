@@ -1,7 +1,7 @@
 defmodule KeenPhoenixSvelte.MixProject do
   use Mix.Project
 
-  @version "1.0.0-rc.1"
+  @version "1.0.0-rc.2"
   @source_url "https://github.com/keenmate/keen_phoenix_svelte"
 
   def project do
@@ -22,7 +22,9 @@ defmodule KeenPhoenixSvelte.MixProject do
   end
 
   def application do
-    [extra_applications: [:logger]]
+    # :inets/:ssl back the built-in :httpc client used by the (optional) island
+    # proxy; they're OTP apps, so no external dependency is added.
+    [extra_applications: [:logger, :inets, :ssl]]
   end
 
   defp deps do
@@ -37,7 +39,8 @@ defmodule KeenPhoenixSvelte.MixProject do
     [
       maintainers: ["KeenMate"],
       licenses: ["MIT"],
-      files: ~w(lib assets docs package.json mix.exs README.md CHANGELOG.md LICENSE .formatter.exs),
+      files:
+        ~w(lib assets docs package.json mix.exs README.md CHANGELOG.md LICENSE .formatter.exs),
       links: %{"GitHub" => @source_url}
     ]
   end
@@ -53,6 +56,7 @@ defmodule KeenPhoenixSvelte.MixProject do
         "docs/authoring-apps.md": [title: "Authoring apps"],
         "docs/server-communication.md": [title: "Server communication"],
         "docs/multiple-apps.md": [title: "Worked example: multiple apps"],
+        "docs/external-apps.md": [title: "External apps (CDN, direct vs proxy)"],
         "CHANGELOG.md": [title: "Changelog"]
       ],
       groups_for_extras: [Guides: ~r{docs/}]

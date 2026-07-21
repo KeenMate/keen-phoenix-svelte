@@ -1,14 +1,23 @@
 defmodule KeenPhoenixSvelte do
   @moduledoc """
-  Auto-mount compiled Svelte components inside Phoenix LiveView.
+  Auto-mount compiled client apps ("islands") inside Phoenix — LiveView or plain
+  pages.
+
+  Svelte is the first-class, tooled path (hence the name), but the mount boundary
+  is **framework-neutral**: any island whose JS entry default-exports
+  `(target, { props, context, live, api, channel, bus, el }) => { setProps, destroy }`
+  works — Svelte, Lit, React, or hand-written vanilla JS. Because every island
+  mounts through that one contract, there is a **single** component, `app/1` — the
+  framework makes no difference to how it's rendered or mounted. (`svelte/1` is a
+  thin back-compat alias.)
 
   This library ships two cooperating halves:
 
-    * an Elixir **function component** (`svelte/1`) that renders a placeholder
-      `<div>` carrying a LiveView hook, and
+    * an Elixir **function component** (`app/1`) that renders a placeholder `<div>`
+      carrying a LiveView hook, and
     * a JavaScript **hook + `AppsManager`** (published as the npm package
       `@keenmate/phoenix_svelte`) that lazily imports the compiled bundle for
-      the requested app and mounts the Svelte component into that div.
+      the requested app and mounts it into that div.
 
   ## Why a hook (and not `data-app` + `window.load`)
 
@@ -25,7 +34,7 @@ defmodule KeenPhoenixSvelte do
 
   ## Usage
 
-      <.svelte name="like" id={"like-\#{@id}"} props={%{id: @id, liked: @liked}} />
+      <.app name="like" id={"like-\#{@id}"} props={%{id: @id, liked: @liked}} />
 
   The `id` must be unique and stable (required by LiveView hooks). Props are
   JSON-encoded into a data attribute and parsed back on the client, so nested
@@ -35,28 +44,90 @@ defmodule KeenPhoenixSvelte do
   use Phoenix.Component
 
   @doc """
-  Renders a mount point for the compiled Svelte app named `name`.
+  Renders a mount point for the compiled client app ("island") named `name`.
+
+  This is the one and only island component. It is **framework-neutral**: the
+  bundle can be Svelte, Lit, React or vanilla JS, and it is rendered and mounted
+  identically regardless — the framework never changes the wiring. Set the
+  optional `framework` attribute only if you want a `data-framework` tag for
+  debugging/inspection; it has no effect on behavior.
 
   ## Attributes
 
     * `name` (required) - the app folder name under `assets/apps/`, resolved at
-      runtime to `/apps/<name>/main.mjs`.
+      runtime to `/apps/<name>/main.mjs` (or a registered/CDN URL — see
+      `KeenPhoenixSvelte.Apps`).
     * `id` (required) - unique, stable DOM id (LiveView hooks require it).
-    * `props` - a map passed to the Svelte component. Defaults to `%{}`.
+    * `props` - a map passed to the app. Defaults to `%{}`.
+    * `framework` - optional label emitted as `data-framework` (informational
+      only; the runtime never reads it).
     * `class` - optional class list on the wrapper div.
     * `tag` - wrapper element, defaults to `"div"`.
 
   Any other attribute (e.g. `data-*`, `style`) is forwarded to the wrapper via
   the `:global` attribute.
+
+  ## Placeholder / loader (no flash of empty container)
+
+  Until the compiled bundle is fetched and mounted, the wrapper would otherwise
+  be empty. To avoid that flash, the wrapper is rendered with a **placeholder**
+  that the client clears the instant it mounts the app (after the bundle loads,
+  so it stays visible for the whole fetch). Because the wrapper is
+  `phx-update="ignore"`, the placeholder is rendered once and never re-diffed.
+
+  Resolution, most specific first:
+
+    1. A `<:placeholder>` slot on this call — full HEEx, overrides everything.
+       An empty slot (`<:placeholder />`) disables the placeholder for this app.
+    2. The server-wide default, `config :keen_phoenix_svelte, :placeholder`.
+    3. A built-in, dependency-free skeleton (used when nothing is configured).
+
+  Configure the server-wide default once (e.g. in `config/config.exs`):
+
+      # raw HTML string
+      config :keen_phoenix_svelte, placeholder: ~s(<div class="my-skeleton"></div>)
+
+      # or a function (1-arity gets the app name), or false to disable globally
+      config :keen_phoenix_svelte, placeholder: &MyApp.island_loader/1
+      config :keen_phoenix_svelte, placeholder: false
+
+  Per app, override with the slot:
+
+      <.app name="chart" id="chart" props={@cfg}>
+        <:placeholder>
+          <div class="skeleton h-64 w-full"></div>
+        </:placeholder>
+      </.app>
   """
   attr :name, :string, required: true
   attr :id, :string, required: true
   attr :props, :map, default: %{}
+  attr :framework, :string, default: nil
   attr :class, :any, default: nil
   attr :tag, :string, default: "div"
   attr :rest, :global
 
-  def svelte(assigns) do
+  slot :placeholder,
+    doc: "Markup shown until the island mounts. Overrides the server-wide default."
+
+  def app(assigns) do
+    # Normalize the slot so app/1 is safe to call directly (e.g. from svelte/1,
+    # which delegates here as a plain function and never sets the slot).
+    placeholder = Map.get(assigns, :placeholder, [])
+    # A slot with actual inner content wins. A given-but-empty slot
+    # (`<:placeholder />`) is an explicit opt-out: render nothing. No slot at all
+    # falls back to the server-wide default.
+    render_slot? = Enum.any?(placeholder, &(Map.get(&1, :inner_block) != nil))
+
+    assigns =
+      assigns
+      |> assign(:render_placeholder_slot?, render_slot?)
+      |> assign(
+        :default_placeholder,
+        if(placeholder == [], do: resolve_placeholder(assigns.name))
+      )
+      |> assign(:placeholder, placeholder)
+
     ~H"""
     <.dynamic_tag
       tag_name={@tag}
@@ -65,11 +136,57 @@ defmodule KeenPhoenixSvelte do
       phx-hook="KeenSvelte"
       phx-update="ignore"
       data-app={@name}
+      data-framework={@framework}
       data-props={Jason.encode!(@props)}
       {@rest}
-    ></.dynamic_tag>
+    >
+      <%= cond do %>
+        <% @render_placeholder_slot? -> %>
+          {render_slot(@placeholder)}
+        <% @default_placeholder -> %>
+          {Phoenix.HTML.raw(@default_placeholder)}
+        <% true -> %>
+      <% end %>
+    </.dynamic_tag>
     """
   end
+
+  # The built-in loader: a neutral skeleton block that fills the container with a
+  # gentle opacity pulse. Inline styles + `currentColor` so it renders identically
+  # (and theme-adaptively) on LiveView and plain pages — islands carry no Tailwind.
+  # `min-height` keeps it visible when the container has no intrinsic size; the
+  # pulse stays subtle so it reads as "content loading", not "app busy".
+  @default_placeholder ~s|<div aria-hidden="true" style="width:100%;height:100%;min-height:2.5rem;border-radius:.5rem;background:currentColor;opacity:.12;animation:keen-island-pulse 1.4s ease-in-out infinite"></div><style>@keyframes keen-island-pulse{0%,100%{opacity:.1}50%{opacity:.2}}</style>|
+
+  # Resolves the server-wide placeholder for `name`. Unset -> built-in skeleton;
+  # `false`/`nil` -> none; a string -> raw HTML; a function or {mod, fun} -> its
+  # result (a 1-arity function/`{mod, fun}` receives the app name).
+  defp resolve_placeholder(name) do
+    case Application.get_env(:keen_phoenix_svelte, :placeholder, :__builtin__) do
+      :__builtin__ -> @default_placeholder
+      builtin when builtin in [true, :default] -> @default_placeholder
+      falsy when falsy in [false, nil] -> nil
+      html when is_binary(html) -> html
+      fun when is_function(fun, 0) -> fun.()
+      fun when is_function(fun, 1) -> fun.(name)
+      {mod, fun} -> apply(mod, fun, [name])
+    end
+  end
+
+  @doc """
+  Back-compat alias for `app/1`, tagged as a Svelte app.
+
+  Kept because `<.svelte>` shipped in `1.0.0-rc.1`. New code should prefer
+  `app/1`; the two are identical apart from the `data-framework="svelte"` tag.
+  """
+  attr :name, :string, required: true
+  attr :id, :string, required: true
+  attr :props, :map, default: %{}
+  attr :class, :any, default: nil
+  attr :tag, :string, default: "div"
+  attr :rest, :global
+  slot :placeholder
+  def svelte(assigns), do: app(assign(assigns, :framework, "svelte"))
 
   @doc """
   Emits the page-wide runtime context, read once by the client and injected into
@@ -95,8 +212,19 @@ defmodule KeenPhoenixSvelte do
   attr :id, :string, default: "keen-context"
 
   def runtime(assigns) do
+    assigns = assign(assigns, :apps_manifest, KeenPhoenixSvelte.Apps.manifest())
+
     ~H"""
-    <script type="application/json" id={@id}><%= Phoenix.HTML.raw(Jason.encode!(@context, escape: :html_safe)) %></script>
+    <script type="application/json" id={@id}>
+      <%= Phoenix.HTML.raw(Jason.encode!(@context, escape: :html_safe)) %>
+    </script>
+    <script
+      :if={@apps_manifest != %{}}
+      type="application/json"
+      id="keen-apps"
+    >
+      <%= Phoenix.HTML.raw(Jason.encode!(@apps_manifest, escape: :html_safe)) %>
+    </script>
     """
   end
 end

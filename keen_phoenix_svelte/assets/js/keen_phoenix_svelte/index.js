@@ -4,14 +4,17 @@ import {
   getApi,
   getChannel,
   getBus,
+  getAppsManifest,
   mountStatic as mountStaticWith,
 } from "./runtime";
 
 export { AppsManager };
-export { getContext, getApi, getChannel, getBus } from "./runtime";
+export { getContext, getApi, getChannel, getBus, getAppsManifest } from "./runtime";
 
-// A single shared manager instance is enough for most apps.
-export const appsManager = new AppsManager();
+// A single shared manager instance is enough for most apps. It's given the app
+// manifest lazily (read from the page on first mount), so registered/external
+// apps resolve to their configured URL and everything else uses the base path.
+export const appsManager = new AppsManager({ manifest: getAppsManifest });
 
 /**
  * Mount every `[data-app]` on a plain (non-LiveView) page. Call once after the

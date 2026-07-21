@@ -12,11 +12,29 @@ Write this in a template:
 …and the compiled Svelte app in `assets/apps/like/` is mounted into that element,
 kept in sync with server state, given a `context`/`api`/`channel`/`live` bridge to
 the server (plus a `bus` for island-to-island messaging), and torn down on
-navigation — no manual `<script>`/`<link>` wiring.
+navigation — no manual `<script>`/`<link>` wiring. A configurable placeholder
+shows while the bundle loads (server-wide default, per-app `<:placeholder>`
+override), so there's no flash of empty container.
+
+Svelte is the first-class, tooled path, but the mount boundary is
+**framework-neutral** — an island's entry just default-exports
+`(target, opts) => { setProps, destroy }`. Because every island mounts through
+that one contract, there's a single component, `<.app>` (an optional
+`framework="…"` attribute just tags `data-framework` for debugging). The demo
+mounts Svelte, Lit, React and vanilla-JS islands through it. `<.svelte>` remains
+as a back-compat alias.
 
 > **New here, or comparing this to `live_svelte`?** Start with
 > **[Philosophy & comparison](docs/philosophy.md)** — the autonomous-island model,
 > what this deliberately doesn't do, and how it differs from `live_svelte`.
+
+## What's New in v1.0.0-rc.2
+
+- **Framework-neutral `<.app>` — one component mounts any island** — Every island mounts through the same `(target, opts) => { setProps, destroy }` contract, so there is now a single `app/1` component regardless of whether the bundle is Svelte, Lit, React, or hand-written vanilla JS. An optional `framework` attribute just emits an informational `data-framework` tag. `<.svelte>` remains as a back-compat alias for the rc.1 name.
+- **Placeholder / loader — no flash of empty container** — `<.app>` renders a placeholder that the client clears the instant the bundle mounts (after the fetch, so it stays visible the whole time). Resolution is a per-call `<:placeholder>` slot › the server-wide `config :keen_phoenix_svelte, :placeholder` › a built-in, dependency-free skeleton. The server default accepts an HTML string, a function, `{mod, fun}`, or `false` to disable.
+- **Event bus — island-to-island messaging without the server** — A `bus` joins the app boundary: a page-wide, client-side pub/sub (`emit`/`on`/`once`) over a DOM `EventTarget`, wired into both the LiveView hook and `mountStatic()`, so independent islands coordinate without a round-trip and without importing each other.
+- **External apps — a registry with `:direct`/`:proxy` delivery** — `KeenPhoenixSvelte.Apps` registers islands whose bundle lives elsewhere (a CDN, another deploy); `<.runtime>` emits a `name → url` manifest and `AppsManager.resolve/1` loads them. Pick `:direct` (browser imports the CDN URL) or `:proxy` (Phoenix fetches and re-serves same-origin via `KeenPhoenixSvelte.IslandProxy` — no CORS, CSP `'self'`).
+- **Example reworked into "KeenSpace"** — the demo is now a Teams-style workspace that doubles as reference code: chat over channel + Presence, a video catalogue over the REST helper, a calendar over `context.tokens`, a bus-driven activity toast, simulated i18n, a plain (non-LiveView) route, and Lit/React/vanilla islands alongside the Svelte ones.
 
 ## What's New in v1.0.0-rc.1
 
@@ -55,7 +73,8 @@ steps in [Installation & setup](docs/installation.md).
 
 - [Installation & setup](docs/installation.md) — wire the library into your app
 - [Authoring apps](docs/authoring-apps.md) — folder layout, the mount contract, Svelte 5 & 4
-- [Server communication](docs/server-communication.md) — runtime context, `live`, `api`, `channel`
+- [Server communication](docs/server-communication.md) — runtime context, `live`, `api`, `channel`, `bus`
+- [External apps (CDN, direct vs proxy)](docs/external-apps.md) — load islands from elsewhere, and the `:direct`/`:proxy` delivery modes
 
 A complete, runnable demo (the `like` app on a LiveView route and a plain route,
 plus a channel) lives in the

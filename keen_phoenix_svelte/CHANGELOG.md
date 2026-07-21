@@ -5,9 +5,29 @@ All notable changes to `keen_phoenix_svelte` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.0.0-rc.2] - 2026-07-20 [PUBLISHED]
 
 ### Added
+
+**Framework-neutral component**
+- A single **`app/1`** component for every island, regardless of framework. The
+  mount boundary was always framework-agnostic — the entry just default-exports
+  `(target, opts) => { setProps, destroy }` — so islands can be built with Svelte,
+  Lit, React, or hand-written vanilla JS, and all mount identically. An optional
+  `framework` attribute emits a `data-framework` tag for debugging (informational
+  only; the runtime never reads it). **`svelte/1`** is retained as a back-compat
+  alias for the `1.0.0-rc.1` name (no break).
+
+**Placeholder / loader — no flash of empty container**
+- `app/1` now renders a **placeholder** inside the wrapper that the client clears
+  the instant it mounts the island (after the bundle loads, so it stays visible
+  for the whole fetch). Because the wrapper is `phx-update="ignore"`, it's
+  rendered once and never re-diffed. Resolution is: a per-call `<:placeholder>`
+  slot › the server-wide `config :keen_phoenix_svelte, :placeholder` › a built-in
+  dependency-free skeleton. The server default accepts a raw HTML string, a
+  0/1-arity function (1-arity gets the app name), `{mod, fun}`, or `false` to
+  disable globally. On the client, `AppsManager.create` clears the target
+  (`replaceChildren`) right before mount, so this works for every framework.
 
 **Event bus — island-to-island messaging**
 - `bus` added to the app boundary: a page-wide, client-side pub/sub built on a DOM
@@ -20,6 +40,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   LiveView (unlike `live`, which is `null` on plain pages).
 - The mount boundary is now
   `(target, { props, context, live, api, channel, bus, el }) => handle`.
+
+**External apps — registry + `:direct`/`:proxy` delivery**
+- `KeenPhoenixSvelte.Apps` — a config- (or DB-) driven registry for apps whose
+  bundle lives elsewhere (a CDN, another deploy). `<KeenPhoenixSvelte.runtime>`
+  now also emits a `name → url` **manifest** (`#keen-apps`), and `AppsManager`
+  gained `resolve(name)` to load registered apps from that URL (unlisted apps
+  still use `basePath`). `getAppsManifest()` exported.
+- A per-app/global **mode of operation**: `:direct` (browser imports the CDN URL
+  — needs CORS + a permissive CSP) or `:proxy` (browser imports a same-origin
+  path and Phoenix fetches the bundle upstream — no CORS, `script-src 'self'`,
+  the corporate-friendly mode).
+- `KeenPhoenixSvelte.IslandProxy` — a `Plug` for the proxy mode: fetches the
+  upstream bundle (built-in `:httpc`, or an injectable `:island_fetcher`), caches
+  it in `:persistent_term`, and serves it as `text/javascript` with an immutable
+  cache header.
 
 ### Changed
 
@@ -35,6 +70,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     (non-LiveView) route exercising `mountStatic()`, a user switcher, and a
     simulated **i18n** (English / Spanish) with the locale delivered through
     `context`.
+  - A framework-free **`greeter`** island loaded from *outside* `/apps` via the
+    app registry — proxied in dev, direct in prod — demonstrating both delivery
+    modes.
+  - **Lit**, **React**, and **vanilla-JS** islands (`kudos-lit`,
+    `reactions-react`, `hello-js`) mounted through the same boundary as the Svelte
+    apps, showing the components are framework-neutral.
   - Deploy tooling: root `Dockerfile` + `.dockerignore`, `Makefile` `container-*`
     targets, and a prod `runtime.exs`.
 
@@ -111,5 +152,5 @@ islands, on both LiveView and plain controller-rendered pages.
 - External-service token delivery (a server-minted token for a *different*
   service in `context.tokens.*`) — planned, not yet implemented.
 
-[Unreleased]: https://github.com/keenmate/keen_phoenix_svelte/compare/v1.0.0-rc.1...HEAD
+[1.0.0-rc.2]: https://github.com/keenmate/keen_phoenix_svelte/releases/tag/v1.0.0-rc.2
 [1.0.0-rc.1]: https://github.com/keenmate/keen_phoenix_svelte/releases/tag/v1.0.0-rc.1

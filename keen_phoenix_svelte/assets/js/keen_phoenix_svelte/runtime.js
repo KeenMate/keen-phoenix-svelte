@@ -9,6 +9,7 @@ let _context;
 let _api;
 let _channel;
 let _bus;
+let _appsManifest;
 
 /** Reads the JSON emitted by `<KeenPhoenixSvelte.runtime context={...} />`. */
 export function getContext() {
@@ -76,6 +77,23 @@ export function getChannel() {
 export function getBus() {
   if (!_bus) _bus = createBus();
   return _bus;
+}
+
+/**
+ * The `name -> url` app manifest emitted by `<KeenPhoenixSvelte.runtime>` (read
+ * from `#keen-apps`). Tells `AppsManager` where each registered/external app's
+ * bundle lives; apps not listed fall back to the default `basePath`.
+ */
+export function getAppsManifest() {
+  if (_appsManifest === undefined) {
+    const el = document.getElementById("keen-apps");
+    try {
+      _appsManifest = el ? JSON.parse(el.textContent) : {};
+    } catch (_e) {
+      _appsManifest = {};
+    }
+  }
+  return _appsManifest;
 }
 
 function parseProps(el) {
