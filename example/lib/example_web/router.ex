@@ -42,6 +42,7 @@ defmodule ExampleWeb.Router do
       live "/chat", ChatLive, :index
       live "/videos", VideosLive, :index
       live "/calendar", CalendarLive, :index
+      live "/docs", DocsLive, :index
     end
 
     # Plain (non-LiveView) page — the calendar island mounts via mountStatic().

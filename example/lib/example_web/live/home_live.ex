@@ -207,6 +207,12 @@ defmodule ExampleWeb.HomeLive do
               <p class="text-sm text-base-content/60 mt-3">Plain JavaScript — no framework at all.</p>
             </div>
           </div>
+
+          <p class="text-sm mt-4">
+            <.link navigate={~p"/docs"} class="link link-primary inline-flex items-center gap-1">
+              See the adapter each framework needs <.icon name="hero-arrow-right-micro" class="size-4" />
+            </.link>
+          </p>
         </section>
 
         <%!-- Event bus + activity toasts (the highlight) --%>

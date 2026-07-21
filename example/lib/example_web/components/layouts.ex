@@ -133,6 +133,12 @@ defmodule ExampleWeb.Layouts do
                   icon="hero-calendar-days"
                   label={I18n.t(@locale, "nav.calendar")}
                 />
+                <.nav_item
+                  navigate={~p"/docs"}
+                  active={@active == :docs}
+                  icon="hero-book-open"
+                  label={I18n.t(@locale, "nav.docs")}
+                />
               </nav>
 
               <p class="p-3 text-xs text-base-content/40">
@@ -174,8 +180,9 @@ defmodule ExampleWeb.Layouts do
 
   # The header title: prefer the localized nav label for the four main areas,
   # otherwise fall back to the page-supplied title (e.g. the plain calendar page).
-  defp header_title(locale, active, _title) when active in [:home, :chat, :videos, :calendar],
-    do: I18n.t(locale, "nav.#{active}")
+  defp header_title(locale, active, _title)
+       when active in [:home, :chat, :videos, :calendar, :docs],
+       do: I18n.t(locale, "nav.#{active}")
 
   defp header_title(_locale, _active, title), do: title || ""
 
