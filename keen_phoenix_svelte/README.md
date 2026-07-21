@@ -1,5 +1,9 @@
 # keen_phoenix_svelte
 
+**🌐 Live demo & docs: [keen-phoenix-svelte.keenmate.dev](https://keen-phoenix-svelte.keenmate.dev)** ·
+[Hex](https://hex.pm/packages/keen_phoenix_svelte) ·
+[HexDocs](https://hexdocs.pm/keen_phoenix_svelte)
+
 Auto-mount compiled **Svelte** apps into **Phoenix** — on both **LiveView** and
 plain controller-rendered pages — as self-contained islands.
 

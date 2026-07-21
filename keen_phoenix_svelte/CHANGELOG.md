@@ -5,6 +5,34 @@ All notable changes to `keen_phoenix_svelte` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0-rc.3] - 2026-07-21
+
+### Changed
+
+**Naming aligned with `<.app>`** — the proxy and its config now speak "app", not
+"island" (the concept stays "island" in prose; the identifiers match the
+component). These are renames from `1.0.0-rc.2`:
+
+- `KeenPhoenixSvelte.IslandProxy` → **`KeenPhoenixSvelte.Apps.Proxy`**. Update
+  your `forward` in `router.ex`.
+- The injectable bundle fetcher config `:island_provider` → **`:app_provider`**
+  (still a 1-arity `fn url -> {:ok, body_binary} end`).
+- `proxy_path` default `"/keen-islands"` → **`"/apps"`**, so it shares the
+  `base_path` prefix: local bundles are static files at `/apps/<name>/main.mjs`
+  (served by Plug.Static, which runs before the router) and proxied bundles
+  resolve at `/apps/<name>` via the forward — the two coexist under one prefix.
+- Built-in placeholder skeleton keyframe `keen-island-pulse` → `keen-app-pulse`,
+  and the doc example `&MyApp.island_loader/1` → `&MyApp.app_loader/1`
+  (cosmetic; no API change).
+
+### Fixed
+
+- **Package metadata / links** — corrected `:source_url` to
+  `KeenMate/keen-phoenix-svelte` (was `keenmate/keen_phoenix_svelte`, wrong
+  casing and underscores), added `homepage_url`, and added a `Website` link to
+  the live demo at <https://keen-phoenix-svelte.keenmate.dev> alongside the
+  existing GitHub link.
+
 ## [1.0.0-rc.2] - 2026-07-20 [PUBLISHED]
 
 ### Added
