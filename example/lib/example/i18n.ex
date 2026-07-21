@@ -31,6 +31,8 @@ defmodule Example.I18n do
       "nav.calendar" => "Calendar",
       "shell.tagline" => "Built with keen_phoenix_svelte",
       "shell.github" => "View source on GitHub",
+      "shell.menu" => "Menu",
+      "shell.closeMenu" => "Close menu",
       "switch.user" => "Switch user (demo)",
       "switch.language" => "Language"
     },
@@ -41,6 +43,8 @@ defmodule Example.I18n do
       "nav.calendar" => "Calendario",
       "shell.tagline" => "Hecho con keen_phoenix_svelte",
       "shell.github" => "Ver el código en GitHub",
+      "shell.menu" => "Menú",
+      "shell.closeMenu" => "Cerrar menú",
       "switch.user" => "Cambiar usuario (demo)",
       "switch.language" => "Idioma"
     }

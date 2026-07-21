@@ -13,6 +13,24 @@ defmodule ExampleWeb.Layouts do
   # and other static content.
   embed_templates "layouts/*"
 
+  # Site-wide SEO / social metadata, used by the root layout's <head> (meta
+  # description + Open Graph + Twitter card). This site is the live demo *for the
+  # package*, so the metadata describes keen_phoenix_svelte itself.
+  @site_name "keen_phoenix_svelte"
+  @og_title "keen_phoenix_svelte — compiled Svelte apps as Phoenix islands"
+  @site_description "Auto-mount compiled Svelte — or Lit, React, vanilla-JS — apps into Phoenix, on both LiveView and plain pages, as self-contained islands. Each island gets a standard server boundary (context, live, api, channel) and a client-side event bus. A dual Hex + npm package."
+
+  @keywords "keen_phoenix_svelte, @keenmate/phoenix_svelte, Phoenix, Phoenix LiveView, Svelte, Elixir, islands architecture, Phoenix islands, Svelte islands, Lit, React, web components, Hex package, npm, KeenMate"
+
+  @doc "The app/site name (Open Graph `site_name`, title suffix)."
+  def site_name, do: @site_name
+  @doc "The social-share title (Open Graph / Twitter)."
+  def og_title, do: @og_title
+  @doc "The meta description shared by SEO + Open Graph + Twitter."
+  def site_description, do: @site_description
+  @doc "SEO keywords describing the package."
+  def keywords, do: @keywords
+
   @doc """
   The KeenSpace workspace shell: a fixed sidebar (Chat / Videos / Calendar), a
   top bar with the theme toggle and user switcher, and a content area where the
@@ -32,79 +50,96 @@ defmodule ExampleWeb.Layouts do
   def workspace(assigns) do
     ~H"""
     <div class="min-h-screen bg-base-300 text-base-content">
-      <%!-- Centered app canvas: the whole workspace is capped at 1600px and
-      centered, so on wide screens it reads as one focused surface. --%>
-      <div class="mx-auto max-w-[1600px] min-h-screen flex bg-base-200 shadow-xl">
-        <aside class="w-60 shrink-0 bg-base-100 border-r border-base-300 flex flex-col">
-          <.link navigate={~p"/"} class="h-14 px-4 flex items-center gap-2 border-b border-base-300">
-            <span class="text-primary text-xl leading-none">◆</span>
-            <span class="font-bold tracking-tight">KeenSpace</span>
-          </.link>
+      <%!-- Centered app canvas: capped at 1600px and centered so on wide screens
+      it reads as one focused surface. Below `lg` the sidebar collapses into a
+      daisyUI drawer toggled by the header burger. --%>
+      <div class="mx-auto max-w-[1600px] min-h-screen bg-base-200 shadow-xl">
+        <div class="drawer lg:drawer-open">
+          <input id="nav-drawer" type="checkbox" class="drawer-toggle" />
 
-          <nav class="flex-1 p-2 space-y-1">
-            <.nav_item
-              navigate={~p"/"}
-              active={@active == :home}
-              icon="hero-home"
-              label={I18n.t(@locale, "nav.home")}
-            />
-            <.nav_item
-              navigate={~p"/chat"}
-              active={@active == :chat}
-              icon="hero-chat-bubble-left-right"
-              label={I18n.t(@locale, "nav.chat")}
-            />
-            <.nav_item
-              navigate={~p"/videos"}
-              active={@active == :videos}
-              icon="hero-play-circle"
-              label={I18n.t(@locale, "nav.videos")}
-            />
-            <.nav_item
-              navigate={~p"/calendar"}
-              active={@active == :calendar}
-              icon="hero-calendar-days"
-              label={I18n.t(@locale, "nav.calendar")}
-            />
-          </nav>
-
-          <p class="p-3 text-xs text-base-content/40">
-            {I18n.t(@locale, "shell.tagline")}
-          </p>
-        </aside>
-
-        <div class="flex-1 flex flex-col min-w-0">
-          <header class="h-14 shrink-0 bg-base-100 border-b border-base-300 flex items-center justify-between px-6">
-            <h1 class="font-semibold">{header_title(@locale, @active, @title)}</h1>
-            <div class="flex items-center gap-3">
-              <a
-                href="https://github.com/KeenMate/keen-phoenix-svelte"
-                target="_blank"
-                rel="noopener noreferrer"
-                class="flex items-center rounded-lg p-1.5 hover:bg-base-200"
-                title={I18n.t(@locale, "shell.github")}
-              >
-                <svg viewBox="0 0 16 16" fill="currentColor" class="size-5 opacity-70" aria-hidden="true">
-                  <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z" />
-                </svg>
-                <span class="sr-only">GitHub</span>
-              </a>
-              <.theme_toggle />
-              <.language_switcher locale={@locale} />
-              <.user_switcher current_user={@current_user} locale={@locale} />
-            </div>
-          </header>
-
-          <main class="flex-1 overflow-auto">
-            <div class="flex gap-6 p-6 min-h-full">
-              <div class="flex-1 min-w-0">
-                {render_slot(@inner_block)}
+          <div class="drawer-content flex flex-col min-w-0 min-h-screen">
+            <header class="h-14 shrink-0 bg-base-100 border-b border-base-300 flex items-center justify-between px-4 sm:px-6">
+              <div class="flex items-center gap-2 min-w-0">
+                <label
+                  for="nav-drawer"
+                  class="btn btn-ghost btn-sm btn-square lg:hidden"
+                  aria-label={I18n.t(@locale, "shell.menu")}
+                >
+                  <.icon name="hero-bars-3" class="size-5" />
+                </label>
+                <h1 class="font-semibold truncate">{header_title(@locale, @active, @title)}</h1>
               </div>
-              <aside :if={@aside != []} class="hidden lg:block w-80 shrink-0">
-                {render_slot(@aside)}
-              </aside>
-            </div>
-          </main>
+              <div class="flex items-center gap-3">
+                <a
+                  href="https://github.com/KeenMate/keen-phoenix-svelte"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="flex items-center rounded-lg p-1.5 hover:bg-base-200"
+                  title={I18n.t(@locale, "shell.github")}
+                >
+                  <svg viewBox="0 0 16 16" fill="currentColor" class="size-5 opacity-70" aria-hidden="true">
+                    <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z" />
+                  </svg>
+                  <span class="sr-only">GitHub</span>
+                </a>
+                <.theme_toggle />
+                <.language_switcher locale={@locale} />
+                <.user_switcher current_user={@current_user} locale={@locale} />
+              </div>
+            </header>
+
+            <main class="flex-1 overflow-auto">
+              <div class="flex gap-6 p-6 min-h-full">
+                <div class="flex-1 min-w-0">
+                  {render_slot(@inner_block)}
+                </div>
+                <aside :if={@aside != []} class="hidden lg:block w-80 shrink-0">
+                  {render_slot(@aside)}
+                </aside>
+              </div>
+            </main>
+          </div>
+
+          <div class="drawer-side z-30">
+            <label for="nav-drawer" class="drawer-overlay" aria-label={I18n.t(@locale, "shell.closeMenu")}></label>
+            <aside class="w-60 min-h-screen bg-base-100 border-r border-base-300 flex flex-col">
+              <.link navigate={~p"/"} class="h-14 px-4 flex items-center gap-2 border-b border-base-300">
+                <span class="text-primary text-xl leading-none">◆</span>
+                <span class="font-bold tracking-tight">KeenSpace</span>
+              </.link>
+
+              <nav class="flex-1 p-2 space-y-1">
+                <.nav_item
+                  navigate={~p"/"}
+                  active={@active == :home}
+                  icon="hero-home"
+                  label={I18n.t(@locale, "nav.home")}
+                />
+                <.nav_item
+                  navigate={~p"/chat"}
+                  active={@active == :chat}
+                  icon="hero-chat-bubble-left-right"
+                  label={I18n.t(@locale, "nav.chat")}
+                />
+                <.nav_item
+                  navigate={~p"/videos"}
+                  active={@active == :videos}
+                  icon="hero-play-circle"
+                  label={I18n.t(@locale, "nav.videos")}
+                />
+                <.nav_item
+                  navigate={~p"/calendar"}
+                  active={@active == :calendar}
+                  icon="hero-calendar-days"
+                  label={I18n.t(@locale, "nav.calendar")}
+                />
+              </nav>
+
+              <p class="p-3 text-xs text-base-content/40">
+                {I18n.t(@locale, "shell.tagline")}
+              </p>
+            </aside>
+          </div>
         </div>
       </div>
     </div>
