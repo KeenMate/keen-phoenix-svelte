@@ -488,8 +488,12 @@ defmodule ExampleWeb.DocsLive do
           <p class="text-base-content/60 mt-4">
             <code>:proxy</code>
             is the corporate-friendly mode: it turns a cross-origin bundle into a first-party
-            asset, sidestepping CORS and a strict CSP. Phoenix fetches the upstream once, caches
-            it in <code>:persistent_term</code>, and re-serves it same-origin. It's the mode the
+            asset, sidestepping CORS and a strict CSP. Phoenix fetches the upstream, caches it in
+            ETS, and re-serves it same-origin. A stale entry is <em>revalidated</em> with a
+            single-flight conditional <code>GET</code> (<code>If-None-Match</code>), driven by the
+            upstream's <code>Cache-Control</code>/<code>ETag</code> with a <code>:ttl</code>
+            fallback — so even an unversioned <code>…/app.js</code> is re-checked, not pinned. It's
+            the mode the
             <.link navigate={~p"/"} class="link link-primary">home page</.link>
             demo uses for its externally-loaded <code>greeter</code> island.
           </p>
@@ -497,10 +501,10 @@ defmodule ExampleWeb.DocsLive do
           <pre class="mt-3 bg-base-300/50 rounded-lg p-3 overflow-x-auto text-xs"><code>{@proxy_config}</code></pre>
 
           <p class="text-sm text-base-content/50 mt-3">
-            Version your CDN URLs (<code>…/org-chart@1.4.2/…</code>) so a new version is a new
-            URL — same name, fresh bundle, no stale cache. The registry is just data: build the
-            same map from a database at runtime with
-            <code>Application.put_env/3</code>; it's read per request.
+            A versioned CDN URL (<code>…/org-chart@1.4.2/…</code>) can set <code>immutable: true</code>
+            to skip revalidation; anything else is re-checked on the <code>:ttl</code> cadence, so it
+            never goes stale. The registry is just data: build the same map from a database at runtime
+            with <code>Application.put_env/3</code>; it's read per request.
           </p>
         </section>
 
