@@ -24,7 +24,7 @@ defmodule KeenPhoenixSvelteComponentTest do
     Application.delete_env(:keen_phoenix_svelte, :placeholder)
     html = render_component(&KeenPhoenixSvelte.app/1, %{name: "like", id: "like-1"})
 
-    assert html =~ "keen-island-pulse"
+    assert html =~ "keen-app-pulse"
   end
 
   test "a configured HTML string becomes the placeholder" do
@@ -32,7 +32,7 @@ defmodule KeenPhoenixSvelteComponentTest do
     html = render_component(&KeenPhoenixSvelte.app/1, %{name: "like", id: "like-1"})
 
     assert html =~ ~s(<div class="skel"></div>)
-    refute html =~ "keen-island-pulse"
+    refute html =~ "keen-app-pulse"
   end
 
   test "a configured function receives the app name" do
@@ -49,7 +49,7 @@ defmodule KeenPhoenixSvelteComponentTest do
     Application.put_env(:keen_phoenix_svelte, :placeholder, false)
     html = render_component(&KeenPhoenixSvelte.app/1, %{name: "like", id: "like-1"})
 
-    refute html =~ "keen-island-pulse"
+    refute html =~ "keen-app-pulse"
   end
 
   test "an empty <:placeholder /> slot opts out, even with a server default set" do
@@ -65,7 +65,7 @@ defmodule KeenPhoenixSvelteComponentTest do
       })
 
     refute html =~ "skel"
-    refute html =~ "keen-island-pulse"
+    refute html =~ "keen-app-pulse"
   end
 
   test "a :placeholder slot overrides the server default" do

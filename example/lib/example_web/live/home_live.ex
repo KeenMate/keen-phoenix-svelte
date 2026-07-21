@@ -275,7 +275,7 @@ defmodule ExampleWeb.HomeLive do
             <li>
               <code>:proxy</code>
               — the browser imports a same-origin path and Phoenix fetches the bundle
-              upstream (<code>KeenPhoenixSvelte.IslandProxy</code>) — no CORS, CSP <code>'self'</code>, the corporate-friendly mode.
+              upstream (<code>KeenPhoenixSvelte.Apps.Proxy</code>) — no CORS, CSP <code>'self'</code>, the corporate-friendly mode.
               <strong>Active here in dev.</strong>
             </li>
           </ul>

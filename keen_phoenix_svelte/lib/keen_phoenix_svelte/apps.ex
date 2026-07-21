@@ -17,7 +17,7 @@ defmodule KeenPhoenixSvelte.Apps do
       be allowed by your CSP `script-src`.
     * `:proxy` — the browser imports a **same-origin** path on your Phoenix app,
       and the server fetches the real bundle upstream (see
-      `KeenPhoenixSvelte.IslandProxy`). No CORS, `script-src 'self'` is enough,
+      `KeenPhoenixSvelte.Apps.Proxy`). No CORS, `script-src 'self'` is enough,
       and you can gate/patch/verify the bundle — the corporate-friendly default.
 
   The mode only changes *which URL the client imports*; the client itself is
@@ -28,9 +28,13 @@ defmodule KeenPhoenixSvelte.Apps do
       config :keen_phoenix_svelte,
         # global default mode for registered apps
         load_mode: :proxy,
-        # where proxied bundles are served from (must match your router forward)
-        proxy_path: "/keen-islands",
-        # local apps still load from here
+        # where proxied bundles are served from (must match your router forward).
+        # Defaults to the same "/apps" prefix as base_path: local bundles are
+        # static files at /apps/<name>/main.mjs (served by Plug.Static, which runs
+        # before the router), proxied bundles resolve at /apps/<name> via the
+        # forward — the two coexist under one prefix.
+        proxy_path: "/apps",
+        # local apps load from here
         base_path: "/apps",
         apps: %{
           # a plain URL uses the global load_mode:
@@ -49,7 +53,7 @@ defmodule KeenPhoenixSvelte.Apps do
 
   @doc "Same-origin base path proxied bundles are served under (matches the router forward)."
   @spec proxy_path() :: String.t()
-  def proxy_path, do: get(:proxy_path, "/keen-islands")
+  def proxy_path, do: get(:proxy_path, "/apps")
 
   @doc "Base path local (unregistered) apps load from."
   @spec base_path() :: String.t()

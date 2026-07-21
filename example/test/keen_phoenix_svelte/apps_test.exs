@@ -28,7 +28,7 @@ defmodule KeenPhoenixSvelte.AppsTest do
     Application.put_env(:keen_phoenix_svelte, :load_mode, :proxy)
     Application.put_env(:keen_phoenix_svelte, :apps, %{"x" => "https://cdn/x.mjs"})
 
-    assert Apps.manifest() == %{"x" => "/keen-islands/x"}
+    assert Apps.manifest() == %{"x" => "/apps/x"}
     assert Apps.upstream("x") == "https://cdn/x.mjs"
   end
 

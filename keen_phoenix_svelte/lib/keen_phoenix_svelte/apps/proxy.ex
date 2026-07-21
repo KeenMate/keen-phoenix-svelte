@@ -1,31 +1,37 @@
-defmodule KeenPhoenixSvelte.IslandProxy do
+defmodule KeenPhoenixSvelte.Apps.Proxy do
   @moduledoc """
-  Serves a registered island's bundle **same-origin** by fetching it upstream on
+  Serves a registered app's bundle **same-origin** by fetching it upstream on
   the server. This is the `:proxy` mode from `KeenPhoenixSvelte.Apps` — it turns a
   cross-origin CDN bundle into a first-party asset so it isn't subject to CORS or
   a strict CSP `script-src`, and lets you gate or cache it.
 
   ## Mounting
 
-  Forward a path (matching `:proxy_path`) to this plug in your router:
+  Forward the `:proxy_path` (defaults to `/apps`) to this plug in your router:
 
-      scope "/keen-islands" do
-        forward "/", KeenPhoenixSvelte.IslandProxy
-      end
+      forward "/apps", KeenPhoenixSvelte.Apps.Proxy
 
-  A request to `/keen-islands/<name>` resolves `<name>` via
+  A request to `/apps/<name>` resolves `<name>` via
   `KeenPhoenixSvelte.Apps.upstream/1`, fetches it once, caches it, and serves it
   as `text/javascript` with a long immutable cache header (so version your CDN
   URLs — same name, new URL busts the cache).
 
+  The default prefix is the same `/apps` that local bundles load from. That's
+  intentional and safe: `Plug.Static` runs before the router, so local files at
+  `/apps/<name>/main.mjs` are served directly, and only unmatched paths
+  (`/apps/<name>`, the proxied bundles) fall through to this plug.
+
   ## Fetching & caching
 
   Bundles are cached in `:persistent_term` keyed by upstream URL (write-once,
-  read-heavy — a handful of small entries). The HTTP fetch uses Erlang's built-in
-  `:httpc` by default; override it for tests or a different client with:
+  read-heavy — a handful of small entries). The upstream fetch uses Erlang's
+  built-in `:httpc` by default; override it for tests or a different client with
+  an `:app_provider` — a 1-arity function returning `{:ok, body_binary}` or
+  `{:error, reason}` (the response is always served as `text/javascript`, so no
+  content type is needed):
 
       config :keen_phoenix_svelte,
-        island_fetcher: fn url -> {:ok, body_binary, "text/javascript"} end
+        app_provider: fn _url -> {:ok, "export default 1;"} end
   """
   @behaviour Plug
 
@@ -45,7 +51,7 @@ defmodule KeenPhoenixSvelte.IslandProxy do
 
     case Apps.upstream(name) do
       nil ->
-        conn |> send_resp(404, "unknown island") |> halt()
+        conn |> send_resp(404, "unknown app") |> halt()
 
       url ->
         serve(conn, url)
@@ -53,7 +59,7 @@ defmodule KeenPhoenixSvelte.IslandProxy do
   end
 
   defp serve(conn, url) do
-    case cached_fetch(url) do
+    case cached_get_bundle(url) do
       {:ok, body} ->
         conn
         # Force a module-friendly type regardless of what upstream reports.
@@ -62,17 +68,17 @@ defmodule KeenPhoenixSvelte.IslandProxy do
         |> send_resp(200, body)
 
       {:error, reason} ->
-        Logger.error("[keen_phoenix_svelte] island proxy failed for #{url}: #{inspect(reason)}")
-        conn |> send_resp(502, "island upstream error") |> halt()
+        Logger.error("[keen_phoenix_svelte] app proxy failed for #{url}: #{inspect(reason)}")
+        conn |> send_resp(502, "app upstream error") |> halt()
     end
   end
 
-  defp cached_fetch(url) do
+  defp cached_get_bundle(url) do
     key = {__MODULE__, url}
 
     case :persistent_term.get(key, nil) do
       nil ->
-        with {:ok, body} <- fetch(url) do
+        with {:ok, body} <- get_bundle(url) do
           :persistent_term.put(key, body)
           {:ok, body}
         end
@@ -82,14 +88,14 @@ defmodule KeenPhoenixSvelte.IslandProxy do
     end
   end
 
-  defp fetch(url) do
-    case Application.get_env(:keen_phoenix_svelte, :island_fetcher) do
+  defp get_bundle(url) do
+    case Application.get_env(:keen_phoenix_svelte, :app_provider) do
       fun when is_function(fun, 1) -> fun.(url)
-      _ -> httpc_fetch(url)
+      _ -> httpc_get_bundle(url)
     end
   end
 
-  defp httpc_fetch(url) do
+  defp httpc_get_bundle(url) do
     {:ok, _} = Application.ensure_all_started(:inets)
     {:ok, _} = Application.ensure_all_started(:ssl)
 

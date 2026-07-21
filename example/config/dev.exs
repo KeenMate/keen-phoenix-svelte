@@ -1,7 +1,7 @@
 import Config
 
 # In dev, deliver the external `greeter` island via the same-origin PROXY: the
-# browser imports /keen-islands/greeter and the server fetches the real bundle
+# browser imports /apps/greeter and the server fetches the real bundle
 # upstream (here, our own /external file — stand-in for a CDN). This is the
 # CSP/CORS-friendly corporate mode. Flip load_mode to :direct to have the browser
 # fetch the upstream URL itself.

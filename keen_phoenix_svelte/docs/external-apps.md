@@ -36,13 +36,13 @@ bytes*. That's the only real choice, and it's a config value:
 ```elixir
 config :keen_phoenix_svelte,
   load_mode: :proxy,            # :direct (default) | :proxy
-  proxy_path: "/keen-islands"   # must match your router forward
+  proxy_path: "/apps"           # must match your router forward (defaults to /apps)
 ```
 
 | | `:direct` | `:proxy` |
 |---|---|---|
 | Who fetches | Browser → CDN | Browser → your app → CDN |
-| Manifest URL | the CDN URL | `"/keen-islands/<name>"` (same-origin) |
+| Manifest URL | the CDN URL | `"/apps/<name>"` (same-origin) |
 | CORS | **required** on the CDN | none |
 | CSP | must allow the CDN in `script-src` | `script-src 'self'` |
 | Auth / gating / SRI | hard (public, cross-origin) | easy (you serve it) |
@@ -53,12 +53,12 @@ first-party asset, sidestepping CORS and a strict CSP. It needs the proxy plug:
 
 ```elixir
 # router.ex
-forward "/keen-islands", KeenPhoenixSvelte.IslandProxy
+forward "/apps", KeenPhoenixSvelte.Apps.Proxy
 ```
 
-`KeenPhoenixSvelte.IslandProxy` resolves `/keen-islands/<name>` to the registered
+`KeenPhoenixSvelte.Apps.Proxy` resolves `/apps/<name>` to the registered
 upstream URL, fetches it once (built-in `:httpc`, or an injectable
-`:island_fetcher`), caches it in `:persistent_term`, and serves it as
+`:app_provider`), caches it in `:persistent_term`, and serves it as
 `text/javascript` with a long immutable cache header. **Version your CDN URLs**
 (`.../org-chart@1.4.2/...`) so a new version is a new URL — same name, fresh
 bundle, no stale cache.

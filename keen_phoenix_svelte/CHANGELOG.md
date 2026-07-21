@@ -51,8 +51,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   — needs CORS + a permissive CSP) or `:proxy` (browser imports a same-origin
   path and Phoenix fetches the bundle upstream — no CORS, `script-src 'self'`,
   the corporate-friendly mode).
-- `KeenPhoenixSvelte.IslandProxy` — a `Plug` for the proxy mode: fetches the
-  upstream bundle (built-in `:httpc`, or an injectable `:island_fetcher`), caches
+- `KeenPhoenixSvelte.Apps.Proxy` — a `Plug` for the proxy mode: fetches the
+  upstream bundle (built-in `:httpc`, or an injectable `:app_provider`), caches
   it in `:persistent_term`, and serves it as `text/javascript` with an immutable
   cache header.
 

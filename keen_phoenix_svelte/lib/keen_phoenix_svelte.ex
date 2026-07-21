@@ -88,7 +88,7 @@ defmodule KeenPhoenixSvelte do
       config :keen_phoenix_svelte, placeholder: ~s(<div class="my-skeleton"></div>)
 
       # or a function (1-arity gets the app name), or false to disable globally
-      config :keen_phoenix_svelte, placeholder: &MyApp.island_loader/1
+      config :keen_phoenix_svelte, placeholder: &MyApp.app_loader/1
       config :keen_phoenix_svelte, placeholder: false
 
   Per app, override with the slot:
@@ -156,7 +156,7 @@ defmodule KeenPhoenixSvelte do
   # (and theme-adaptively) on LiveView and plain pages — islands carry no Tailwind.
   # `min-height` keeps it visible when the container has no intrinsic size; the
   # pulse stays subtle so it reads as "content loading", not "app busy".
-  @default_placeholder ~s|<div aria-hidden="true" style="width:100%;height:100%;min-height:2.5rem;border-radius:.5rem;background:currentColor;opacity:.12;animation:keen-island-pulse 1.4s ease-in-out infinite"></div><style>@keyframes keen-island-pulse{0%,100%{opacity:.1}50%{opacity:.2}}</style>|
+  @default_placeholder ~s|<div aria-hidden="true" style="width:100%;height:100%;min-height:2.5rem;border-radius:.5rem;background:currentColor;opacity:.12;animation:keen-app-pulse 1.4s ease-in-out infinite"></div><style>@keyframes keen-app-pulse{0%,100%{opacity:.1}50%{opacity:.2}}</style>|
 
   # Resolves the server-wide placeholder for `name`. Unset -> built-in skeleton;
   # `false`/`nil` -> none; a string -> raw HTML; a function or {mod, fun} -> its
