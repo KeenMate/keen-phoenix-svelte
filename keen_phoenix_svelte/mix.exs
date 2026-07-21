@@ -3,6 +3,7 @@ defmodule KeenPhoenixSvelte.MixProject do
 
   @version "1.0.0-rc.2"
   @source_url "https://github.com/keenmate/keen_phoenix_svelte"
+  @homepage_url "https://keen-phoenix-svelte.keenmate.dev"
 
   def project do
     [
@@ -17,6 +18,7 @@ defmodule KeenPhoenixSvelte.MixProject do
       package: package(),
       name: "KeenPhoenixSvelte",
       source_url: @source_url,
+      homepage_url: @homepage_url,
       docs: docs()
     ]
   end
@@ -41,7 +43,7 @@ defmodule KeenPhoenixSvelte.MixProject do
       licenses: ["MIT"],
       files:
         ~w(lib assets docs package.json mix.exs README.md CHANGELOG.md LICENSE .formatter.exs),
-      links: %{"GitHub" => @source_url}
+      links: %{"Website" => @homepage_url, "GitHub" => @source_url}
     ]
   end
 
