@@ -77,7 +77,11 @@ defmodule Example.MixProject do
       "assets.setup": [
         "tailwind.install --if-missing",
         "esbuild.install --if-missing",
-        "cmd --cd assets npm install"
+        # --install-links installs the local `file:` library as a real copy, not a
+        # symlink — sidesteps the Vite/Svelte-plugin realpath resolution issue and
+        # keeps this consistent with `make sync-lib`. Refresh the copy after editing
+        # library JS via `make sync-lib` (or `make build-assets`).
+        "cmd --cd assets npm install --install-links"
       ],
       "assets.build": [
         "compile",

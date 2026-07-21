@@ -15,7 +15,7 @@ HEX_VERSION := $(shell grep -E '^\s*@version\s+"' $(LIB)/mix.exs | head -1 | sed
 NPM_VERSION := $(shell grep -E '"version"\s*:' $(LIB)/package.json | head -1 | sed -E 's/.*"version"\s*:\s*"([^"]+)".*/\1/')
 
 .DEFAULT_GOAL := help
-.PHONY: help setup dev server build-assets test clean \
+.PHONY: help setup dev server sync-lib build-assets test clean \
         hex-deps hex-compile hex-build-docs hex-docs hex-build hex-build-inspect \
         hex-publish-dry hex-publish-rc hex-publish \
         npm-pack npm-publish-rc npm-publish \
@@ -28,7 +28,8 @@ help:
 	@echo "Example app (Phoenix demo):"
 	@echo "  setup             Fetch deps, npm install, build assets"
 	@echo "  dev / server      Start the Phoenix server (http://localhost:4000)"
-	@echo "  build-assets      Build Svelte apps + JS + CSS"
+	@echo "  sync-lib          Re-copy the library JS into node_modules (after editing library JS)"
+	@echo "  build-assets      Build Svelte apps + JS + CSS (re-syncs the library first)"
 	@echo "  test              Run the example test suite (the shared publish gate)"
 	@echo "  clean             Remove build artifacts, deps and node_modules"
 	@echo ""
@@ -65,7 +66,18 @@ dev: server
 server:
 	cd $(EXAMPLE) && mix phx.server
 
-build-assets:
+# The npm `@keenmate/phoenix_svelte` dep is a `file:` package installed with
+# --install-links, i.e. a real COPY in node_modules — NOT a symlink (that avoids
+# the Vite/Svelte-plugin realpath resolution issue on Windows). The trade-off:
+# edits to the library's JS don't propagate until the copy is refreshed. `npm
+# install` alone won't re-copy (same version → skipped), so we remove it first.
+# Elixir/HEEx changes never need this — only bundled JS under $(LIB)/assets/js.
+sync-lib:
+	cd $(ASSETS) && rm -rf node_modules/$(NPM_PKG) && npm install --install-links
+
+# Always re-sync the copied library before building, so library-JS edits can't
+# silently ship a stale bundle (run `mix assets.build` directly to skip the sync).
+build-assets: sync-lib
 	cd $(EXAMPLE) && mix assets.build
 
 test:
