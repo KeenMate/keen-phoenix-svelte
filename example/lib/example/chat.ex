@@ -97,6 +97,14 @@ defmodule Example.Chat do
 
   defp meeting_key(meeting_id), do: "meeting:" <> to_string(meeting_id)
 
+  @doc """
+  Wipes all chat (and meeting) history back to the seeded demo state. Used by the
+  periodic maintenance reset and the `/api/maintenance/reset` hook. Data only —
+  notifying open clients is the web layer's job (`ExampleWeb.Maintenance`).
+  """
+  @spec reset() :: :ok
+  def reset, do: GenServer.call(__MODULE__, :reset)
+
   # ---------------------------------------------------------------------------
   # Server
   # ---------------------------------------------------------------------------
@@ -120,6 +128,8 @@ defmodule Example.Chat do
 
     {:reply, {:ok, message}, %{state | messages: messages, next_id: state.next_id + 1}}
   end
+
+  def handle_call(:reset, _from, _state), do: {:reply, :ok, seed()}
 
   # ---------------------------------------------------------------------------
   # Seeding & helpers

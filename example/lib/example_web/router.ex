@@ -27,6 +27,13 @@ defmodule ExampleWeb.Router do
     plug ExampleWeb.Plugs.RequireGraphToken
   end
 
+  # Unauthenticated maintenance hook (demo only): no session/CSRF so it can be
+  # curled or hit by a cron. Safe because it only re-seeds throwaway demo data
+  # (the same reset also runs automatically every 15 minutes).
+  pipeline :maintenance_api do
+    plug :accepts, ["json"]
+  end
+
   scope "/", ExampleWeb do
     pipe_through :browser
 
@@ -52,6 +59,12 @@ defmodule ExampleWeb.Router do
     get "/videos", VideoController, :index
     get "/videos/:id", VideoController, :show
     post "/videos/:id/save", VideoController, :save
+  end
+
+  scope "/api/maintenance", ExampleWeb do
+    pipe_through :maintenance_api
+
+    post "/reset", MaintenanceController, :reset
   end
 
   # Mock Microsoft Graph. In a real app the calendar island would call

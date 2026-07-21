@@ -15,7 +15,9 @@ defmodule Example.Application do
       ExampleWeb.Presence,
       Example.Chat,
       # Start to serve requests, typically the last entry
-      ExampleWeb.Endpoint
+      ExampleWeb.Endpoint,
+      # Periodically resets the demo chat state (needs Endpoint up to broadcast).
+      ExampleWeb.MaintenanceScheduler
     ]
 
     # See https://hexdocs.pm/elixir/Supervisor.html

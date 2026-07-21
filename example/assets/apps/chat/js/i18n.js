@@ -13,6 +13,8 @@ const dict = {
     messageAria: "Message",
     couldntJoin: "Couldn't join this room",
     sendFailed: "Message failed to send",
+    roomReset: "Chat reset",
+    roomResetHint: "The demo periodically clears its messages.",
   },
   es: {
     online: (n) => `${n} en línea`,
@@ -24,6 +26,8 @@ const dict = {
     messageAria: "Mensaje",
     couldntJoin: "No se pudo unir a esta sala",
     sendFailed: "No se pudo enviar el mensaje",
+    roomReset: "Chat reiniciado",
+    roomResetHint: "La demo borra sus mensajes periódicamente.",
   },
 };
 

@@ -10,7 +10,7 @@
   // props: rooms + initialRoom come from the server (<.svelte props=…>);
   // context carries the signed-in user; channel is the Phoenix channel factory;
   // live is the LiveView bridge (null on a plain page).
-  let { rooms = [], initialRoom, context, channel, live } = $props();
+  let { rooms = [], initialRoom, context, channel, live, bus } = $props();
 
   const me = $derived(context.user);
   const locale = $derived(context.locale || "en");
@@ -54,6 +54,17 @@
 
     ch.on("new_message", ({ data }) => {
       messages = [...messages, data];
+    });
+    // Periodic (or manual) demo maintenance reset: the server wiped history and
+    // pushed the fresh seed. Replace our list and surface a toast on the bus.
+    ch.on("room_reset", ({ data }) => {
+      messages = data.messages;
+      bus?.emit("activity", {
+        title: t("roomReset"),
+        text: t("roomResetHint"),
+        icon: "🧹",
+        color: "#64748b",
+      });
     });
     ch.on("presence_state", (state) => {
       presences = state;
