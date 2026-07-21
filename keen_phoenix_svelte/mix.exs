@@ -2,7 +2,7 @@ defmodule KeenPhoenixSvelte.MixProject do
   use Mix.Project
 
   @version "1.0.0-rc.2"
-  @source_url "https://github.com/keenmate/keen_phoenix_svelte"
+  @source_url "https://github.com/KeenMate/keen-phoenix-svelte"
   @homepage_url "https://keen-phoenix-svelte.keenmate.dev"
 
   def project do

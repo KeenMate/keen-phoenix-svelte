@@ -78,7 +78,7 @@ steps in [Installation & setup](docs/installation.md).
 
 A complete, runnable demo (the `like` app on a LiveView route and a plain route,
 plus a channel) lives in the
-[`example/`](https://github.com/keenmate/keen_phoenix_svelte/tree/main/example) app.
+[`example/`](https://github.com/KeenMate/keen-phoenix-svelte/tree/main/example) app.
 
 ## Versioning
 

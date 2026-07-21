@@ -152,5 +152,5 @@ islands, on both LiveView and plain controller-rendered pages.
 - External-service token delivery (a server-minted token for a *different*
   service in `context.tokens.*`) — planned, not yet implemented.
 
-[1.0.0-rc.2]: https://github.com/keenmate/keen_phoenix_svelte/releases/tag/v1.0.0-rc.2
-[1.0.0-rc.1]: https://github.com/keenmate/keen_phoenix_svelte/releases/tag/v1.0.0-rc.1
+[1.0.0-rc.2]: https://github.com/KeenMate/keen-phoenix-svelte/releases/tag/v1.0.0-rc.2
+[1.0.0-rc.1]: https://github.com/KeenMate/keen-phoenix-svelte/releases/tag/v1.0.0-rc.1

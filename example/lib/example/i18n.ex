@@ -30,6 +30,7 @@ defmodule Example.I18n do
       "nav.videos" => "Videos",
       "nav.calendar" => "Calendar",
       "shell.tagline" => "Built with keen_phoenix_svelte",
+      "shell.github" => "View source on GitHub",
       "switch.user" => "Switch user (demo)",
       "switch.language" => "Language"
     },
@@ -39,6 +40,7 @@ defmodule Example.I18n do
       "nav.videos" => "Vídeos",
       "nav.calendar" => "Calendario",
       "shell.tagline" => "Hecho con keen_phoenix_svelte",
+      "shell.github" => "Ver el código en GitHub",
       "switch.user" => "Cambiar usuario (demo)",
       "switch.language" => "Idioma"
     }
