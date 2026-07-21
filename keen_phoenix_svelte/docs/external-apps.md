@@ -46,7 +46,7 @@ config :keen_phoenix_svelte,
 | CORS | **required** on the CDN | none |
 | CSP | must allow the CDN in `script-src` | `script-src 'self'` |
 | Auth / gating / SRI | hard (public, cross-origin) | easy (you serve it) |
-| Server load | none (CDN edge-caches) | in the path → cached (`:persistent_term`) |
+| Server load | none (CDN edge-caches) | in the path → cached + revalidated (`ProxyCache`) |
 
 `:proxy` is the corporate-friendly default: it turns a cross-origin bundle into a
 first-party asset, sidestepping CORS and a strict CSP. It needs the proxy plug:
@@ -57,11 +57,34 @@ forward "/apps", KeenPhoenixSvelte.Apps.Proxy
 ```
 
 `KeenPhoenixSvelte.Apps.Proxy` resolves `/apps/<name>` to the registered
-upstream URL, fetches it once (built-in `:httpc`, or an injectable
-`:app_provider`), caches it in `:persistent_term`, and serves it as
-`text/javascript` with a long immutable cache header. **Version your CDN URLs**
-(`.../org-chart@1.4.2/...`) so a new version is a new URL — same name, fresh
-bundle, no stale cache.
+upstream URL, fetches it (built-in `:httpc`, or an injectable `:app_provider`),
+and caches it in ETS — see `KeenPhoenixSvelte.Apps.ProxyCache`.
+
+The cache **revalidates** rather than pinning forever: a stale entry triggers a
+single-flight conditional `GET` (`If-None-Match`/`If-Modified-Since`), so a `304`
+costs nothing and a `200` swaps the bytes in. Freshness follows the upstream's
+own `Cache-Control`/`ETag` when present, and a `:ttl` (default 5 min) otherwise —
+so this works for **unversioned** upstreams (`.../server-status.js`) that can't be
+busted by URL, not just versioned ones. Tune it globally or per app:
+
+```elixir
+config :keen_phoenix_svelte,
+  proxy_cache: [
+    ttl: :timer.minutes(5),   # fallback when the origin sends no cache directives
+    respect_upstream: true,   # honor upstream Cache-Control / ETag / Last-Modified
+    client_cache_control: "public, max-age=60, stale-while-revalidate=300"
+  ],
+  apps: %{
+    # a truly versioned, immutable URL can skip revalidation entirely:
+    "org-chart" => %{url: "https://cdn.acme.com/org-chart@1.4.2/main.mjs", immutable: true},
+    # a bare, unversioned file is re-checked every minute:
+    "status" => %{url: "https://cdn.acme.com/status.js", ttl: :timer.minutes(1)}
+  }
+```
+
+The proxy also forwards an `ETag` and answers the browser's `If-None-Match` with
+a `304`, so the browser → Phoenix → origin conditional chain revalidates cheaply
+end-to-end.
 
 Per-app override, if some apps should stay direct:
 

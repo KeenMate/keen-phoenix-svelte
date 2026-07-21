@@ -205,7 +205,7 @@ defmodule ExampleWeb.DocsLive do
     %{k: "CORS", direct: "required on the CDN", proxy: "none"},
     %{k: "CSP script-src", direct: "must allow the CDN", proxy: "'self'"},
     %{k: "Auth / gating / SRI", direct: "hard (public, cross-origin)", proxy: "easy (you serve it)"},
-    %{k: "Server load", direct: "none (CDN edge)", proxy: "in path, cached (:persistent_term)"}
+    %{k: "Server load", direct: "none (CDN edge)", proxy: "in path, cached + revalidated (ETS)"}
   ]
 
   def mount(_params, _session, socket) do

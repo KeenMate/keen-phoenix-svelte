@@ -1,7 +1,7 @@
 defmodule KeenPhoenixSvelte.MixProject do
   use Mix.Project
 
-  @version "1.0.0-rc.2"
+  @version "1.0.0-rc.3"
   @source_url "https://github.com/KeenMate/keen-phoenix-svelte"
   @homepage_url "https://keen-phoenix-svelte.keenmate.dev"
 
@@ -24,9 +24,13 @@ defmodule KeenPhoenixSvelte.MixProject do
   end
 
   def application do
-    # :inets/:ssl back the built-in :httpc client used by the (optional) island
-    # proxy; they're OTP apps, so no external dependency is added.
-    [extra_applications: [:logger, :inets, :ssl]]
+    # :inets/:ssl back the built-in :httpc client used by the (optional) app
+    # proxy; they're OTP apps, so no external dependency is added. The supervised
+    # `mod` starts the proxy's single-flight cache (idle unless the proxy is used).
+    [
+      extra_applications: [:logger, :inets, :ssl, :crypto],
+      mod: {KeenPhoenixSvelte.Application, []}
+    ]
   end
 
   defp deps do

@@ -5,7 +5,43 @@ All notable changes to `keen_phoenix_svelte` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.0.0-rc.3] - 2026-07-21
+## [1.0.0-rc.3] - 2026-07-21 [PUBLISHED]
+
+### Added
+
+**Proxy cache with revalidation — `:proxy` mode now works for unversioned upstreams**
+- `KeenPhoenixSvelte.Apps.ProxyCache` — a single-flight cache/refresher backing
+  the app proxy. Bundles are held in a `:public` ETS table (direct concurrent
+  reads on the hot path; large bodies are refc binaries, shared not copied), and
+  a **stale** entry triggers a conditional `GET`
+  (`If-None-Match`/`If-Modified-Since`): a `304` keeps the cached bytes, a `200`
+  swaps them. Concurrent requests for the same stale URL collapse into one
+  upstream fetch (no cache stampede); an upstream error serves the last-good copy
+  fail-open.
+- **Freshness policy** — `respect_upstream: true` (default) honors the upstream
+  `Cache-Control`/`ETag`/`Last-Modified`, falling back to a `:ttl` (default
+  5 min) when the origin is silent. This is what makes the proxy correct for
+  **unversioned** upstreams (`cdn/app.js`, `.../server-status.js`) that can't be
+  cache-busted by URL — they're re-checked on the TTL cadence instead of being
+  pinned forever. Config via a `:proxy_cache` keyword, with per-app `ttl` and
+  `immutable` overrides (`KeenPhoenixSvelte.Apps.proxy_opts/1`).
+- **Bounded memory** — cache entries upsert by URL, so refreshes never grow the
+  table; a periodic sweep (`:sweep_interval`, default 1h, `false` to disable)
+  evicts orphaned URLs no longer in the registry, so a rotating DB-driven registry
+  stays bounded to its current working set.
+- **End-to-end conditional chain** — the proxy forwards an `ETag` (synthesizing a
+  weak one when the origin ships none) and a revalidate-friendly `Cache-Control`
+  (configurable; per-app `immutable` opt-in for truly versioned URLs), and
+  answers the browser's `If-None-Match` with a `304`. So browser → Phoenix →
+  origin all revalidate cheaply. Replaces the previous fixed 1-year `immutable`
+  header, which pinned proxied bundles in browsers for up to a year even after
+  the upstream changed.
+- The injectable `:app_provider` gains a 2-arity form
+  `fn url, validators -> {:ok, resp} | :not_modified | {:error, reason} end` for
+  conditional revalidation; the 1-arity `fn url -> {:ok, body} end` still works
+  (treated as a fresh `200`).
+- The library now starts a small supervision tree (`mod:` in `mix.exs`) for the
+  cache and its `Task.Supervisor` — idle unless the proxy is mounted and hit.
 
 ### Changed
 
@@ -180,5 +216,6 @@ islands, on both LiveView and plain controller-rendered pages.
 - External-service token delivery (a server-minted token for a *different*
   service in `context.tokens.*`) — planned, not yet implemented.
 
+[1.0.0-rc.3]: https://github.com/KeenMate/keen-phoenix-svelte/releases/tag/v1.0.0-rc.3
 [1.0.0-rc.2]: https://github.com/KeenMate/keen-phoenix-svelte/releases/tag/v1.0.0-rc.2
 [1.0.0-rc.1]: https://github.com/KeenMate/keen-phoenix-svelte/releases/tag/v1.0.0-rc.1

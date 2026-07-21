@@ -48,6 +48,23 @@ defmodule KeenPhoenixSvelte.AppsTest do
     assert Apps.manifest() == %{}
   end
 
+  test "proxy_opts merges per-app ttl/immutable over the global :proxy_cache config" do
+    orig_cache = Application.get_env(:keen_phoenix_svelte, :proxy_cache)
+    on_exit(fn -> restore(:proxy_cache, orig_cache) end)
+
+    Application.put_env(:keen_phoenix_svelte, :proxy_cache, ttl: 1_000, respect_upstream: false)
+
+    Application.put_env(:keen_phoenix_svelte, :apps, %{
+      "plain" => "https://cdn/plain.mjs",
+      "quick" => %{url: "https://cdn/quick.mjs", ttl: 250},
+      "pinned" => %{url: "https://cdn/pinned.mjs", immutable: true}
+    })
+
+    assert %{ttl_ms: 1_000, respect_upstream: false, immutable: false} = Apps.proxy_opts("plain")
+    assert %{ttl_ms: 250} = Apps.proxy_opts("quick")
+    assert %{immutable: true} = Apps.proxy_opts("pinned")
+  end
+
   defp restore(_key, nil), do: :ok
   defp restore(key, val), do: Application.put_env(:keen_phoenix_svelte, key, val)
 end

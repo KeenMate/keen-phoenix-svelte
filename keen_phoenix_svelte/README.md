@@ -32,6 +32,14 @@ as a back-compat alias.
 > **[Philosophy & comparison](docs/philosophy.md)** — the autonomous-island model,
 > what this deliberately doesn't do, and how it differs from `live_svelte`.
 
+## What's New in v1.0.0-rc.3
+
+- **Proxy cache with revalidation — `:proxy` mode now works for unversioned upstreams** — Registered proxied bundles are cached in ETS and *revalidated* rather than pinned forever: a stale entry triggers a single-flight conditional `GET` (`If-None-Match`/`If-Modified-Since`), so a `304` keeps the bytes and a `200` swaps them, with concurrent requests collapsed into one upstream fetch. Freshness follows the upstream's `Cache-Control`/`ETag`, falling back to a `:ttl` (default 5 min) — so a bare `cdn/app.js` with no version in its URL is re-checked on a cadence instead of cached for a year.
+- **End-to-end conditional-request chain** — The proxy forwards an `ETag` (synthesizing a weak one when the origin ships none) and answers the browser's `If-None-Match` with a `304`, so browser → Phoenix → origin all revalidate cheaply. This replaces the old fixed 1-year `immutable` header; a per-app `immutable: true` opts truly-versioned URLs back into it.
+- **Bounded proxy memory** — Cache entries upsert by URL (refreshes never grow the table) and a periodic sweep evicts URLs no longer in the registry, so a rotating DB-driven app registry stays bounded to its working set.
+- **Renamed to speak "app", not "island"** — `KeenPhoenixSvelte.IslandProxy` → `KeenPhoenixSvelte.Apps.Proxy`, config `:island_provider` → `:app_provider` (which now also accepts a 2-arity conditional-fetch form), and the proxy-path default `/keen-islands` → `/apps` (it shares the `base_path` prefix). Update your router `forward`.
+- **Package metadata / links** — corrected the `:source_url` casing, added `homepage_url`, and a `Website` link to the live demo.
+
 ## What's New in v1.0.0-rc.2
 
 - **Framework-neutral `<.app>` — one component mounts any island** — Every island mounts through the same `(target, opts) => { setProps, destroy }` contract, so there is now a single `app/1` component regardless of whether the bundle is Svelte, Lit, React, or hand-written vanilla JS. An optional `framework` attribute just emits an informational `data-framework` tag. `<.svelte>` remains as a back-compat alias for the rc.1 name.
@@ -40,23 +48,17 @@ as a back-compat alias.
 - **External apps — a registry with `:direct`/`:proxy` delivery** — `KeenPhoenixSvelte.Apps` registers islands whose bundle lives elsewhere (a CDN, another deploy); `<.runtime>` emits a `name → url` manifest and `AppsManager.resolve/1` loads them. Pick `:direct` (browser imports the CDN URL) or `:proxy` (Phoenix fetches and re-serves same-origin via `KeenPhoenixSvelte.Apps.Proxy` — no CORS, CSP `'self'`).
 - **Example reworked into "KeenSpace"** — the demo is now a Teams-style workspace that doubles as reference code: chat over channel + Presence, a video catalogue over the REST helper, a calendar over `context.tokens`, a bus-driven activity toast, simulated i18n, a plain (non-LiveView) route, and Lit/React/vanilla islands alongside the Svelte ones.
 
-## What's New in v1.0.0-rc.1
-
-- **Islands for Phoenix — `<.svelte>` mounts compiled Svelte apps with zero per-page wiring** — The initial release ships the core mounting path: a `<.svelte name id props>` function component renders a hook-bound `<div>` (`phx-update="ignore"`, `data-app`, JSON `data-props`), and the `KeenSvelte` LiveView hook mounts the app on `mounted()`, pushes prop changes on `updated()`, and tears it down on `destroyed()`. `AppsManager` lazily `import()`s `/apps/<name>/main.mjs` and caches it, so only the bundles actually present on a page are fetched — no manual `<script>`/`<link>` tags per app.
-- **One component, two transports — LiveView socket or plain-page REST** — Apps mount identically inside a LiveView or on a plain controller-rendered page. `mountStatic()` scans `[data-app]` on non-LiveView pages (skipping `[data-phx-session]`) and mounts with `live: null`, so the same app talks over `live.pushEvent` when a socket is present and falls back to the `api` REST helper when it isn't.
-- **A standardized app boundary — `props`, `context`, `live`, `api`, `channel`, `bus`** — Every app's entry receives `(target, { props, context, live, api, channel, bus, el }) => handle`. `context` (emitted once per page by `<KeenPhoenixSvelte.runtime>`) carries user/csrf/tokens/api_base/socket; `live` bridges `pushEvent`/`handleEvent` (with automatic subscription cleanup)/`upload`; `api` attaches `x-csrf-token` + session cookie to REST calls; `channel` is a promise-based, envelope-agnostic Phoenix channel factory with auto `cid` correlation; and `bus` is a page-wide client-side event bus (`emit`/`on`/`once`) for island-to-island messaging that works identically with or without LiveView.
-- **Svelte-version-agnostic mount contract** — The mount handle is `{ setProps, destroy }`, so the hook drives Svelte 5 (`mount`/`unmount` + `$state`) and transparently falls back to `$set`/`$destroy` on Svelte 4. Prop updates are diffed in `updated()` to skip redundant re-renders when `data-props` is unchanged.
-- **Dual package — Hex library + bundled npm package** — Ships as both `keen_phoenix_svelte` on Hex and `@keenmate/phoenix_svelte` on npm, released in lockstep at the same version. A Vite config helper (`@keenmate/phoenix_svelte/vite`) builds one self-contained ES module per app with CSS injected by JS. A runnable Phoenix 1.8 demo (the `like` app on both a LiveView route and a plain route, plus a channel) lives in `example/`.
-
 ## How it works
 
 Two cooperating halves:
 
-- **Elixir** — `<.svelte>` renders a hook-bound `<div>` (`phx-update="ignore"`,
+- **Elixir** — `<.app>` renders a hook-bound `<div>` (`phx-update="ignore"`,
   `data-app`, JSON `data-props`); `<KeenPhoenixSvelte.runtime>` emits the page context.
-- **JS** — the `KeenSvelte` hook mounts the app inside a LiveView and `AppsManager`
-  lazily `import()`s `/apps/<name>/main.mjs`; `mountStatic()` mounts apps on plain
-  pages. Only the bundles on a page are fetched.
+- **JS** — the `KeenSvelte` hook mounts the island inside a LiveView and `AppsManager`
+  lazily `import()`s `/apps/<name>/main.mjs` (or a registered URL); `mountStatic()`
+  mounts islands on plain pages. Only the bundles on a page are fetched — and any
+  framework's bundle mounts through the same `(target, opts) => { setProps, destroy }`
+  contract.
 
 `phx-update="ignore"` keeps LiveView out of the Svelte-owned subtree; the hook
 drives mount / prop-update / teardown across live navigation.

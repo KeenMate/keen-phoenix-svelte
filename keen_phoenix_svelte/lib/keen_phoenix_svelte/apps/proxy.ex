@@ -12,26 +12,41 @@ defmodule KeenPhoenixSvelte.Apps.Proxy do
       forward "/apps", KeenPhoenixSvelte.Apps.Proxy
 
   A request to `/apps/<name>` resolves `<name>` via
-  `KeenPhoenixSvelte.Apps.upstream/1`, fetches it once, caches it, and serves it
-  as `text/javascript` with a long immutable cache header (so version your CDN
-  URLs — same name, new URL busts the cache).
+  `KeenPhoenixSvelte.Apps.upstream/1`, serves the cached bundle, and revalidates
+  it upstream when it goes stale.
 
   The default prefix is the same `/apps` that local bundles load from. That's
   intentional and safe: `Plug.Static` runs before the router, so local files at
   `/apps/<name>/main.mjs` are served directly, and only unmatched paths
   (`/apps/<name>`, the proxied bundles) fall through to this plug.
 
-  ## Fetching & caching
+  ## Caching & freshness
 
-  Bundles are cached in `:persistent_term` keyed by upstream URL (write-once,
-  read-heavy — a handful of small entries). The upstream fetch uses Erlang's
-  built-in `:httpc` by default; override it for tests or a different client with
-  an `:app_provider` — a 1-arity function returning `{:ok, body_binary}` or
-  `{:error, reason}` (the response is always served as `text/javascript`, so no
-  content type is needed):
+  The bytes are cached and revalidated by `KeenPhoenixSvelte.Apps.ProxyCache`
+  (ETS + single-flight conditional `GET`). Freshness is driven by
+  the upstream's own `Cache-Control` / `ETag` / `Last-Modified` when present, and
+  falls back to a `:ttl` (default 5 min) otherwise — so **unversioned** upstreams
+  (`cdn/app.js`) are re-checked on a cadence instead of being pinned forever. See
+  `KeenPhoenixSvelte.Apps` for the `:proxy_cache` config and per-app `ttl` /
+  `immutable` overrides.
+
+  On the way out this plug forwards an `ETag` and a revalidate-friendly
+  `Cache-Control` (configurable; `immutable` per app), and answers the browser's
+  own `If-None-Match` with a `304` — completing a browser → Phoenix → origin
+  conditional-request chain.
+
+  ## Fetching
+
+  The upstream fetch uses Erlang's built-in `:httpc` by default. Override it for
+  tests or a different client with an `:app_provider` — either a 1-arity
+  `fn url -> {:ok, body_binary} end` (legacy; always treated as a fresh `200`) or
+  a 2-arity `fn url, validators -> {:ok, resp} | :not_modified | {:error, reason} end`
+  that can honor `validators.etag` / `validators.last_modified` for conditional
+  revalidation (`resp` is a map with `:body` and optional `:etag`,
+  `:last_modified`, `:cache_control`):
 
       config :keen_phoenix_svelte,
-        app_provider: fn _url -> {:ok, "export default 1;"} end
+        app_provider: fn _url, _validators -> {:ok, %{body: "export default 1;"}} end
   """
   @behaviour Plug
 
@@ -39,6 +54,10 @@ defmodule KeenPhoenixSvelte.Apps.Proxy do
   require Logger
 
   alias KeenPhoenixSvelte.Apps
+  alias KeenPhoenixSvelte.Apps.ProxyCache
+
+  @immutable "public, max-age=31536000, immutable"
+  @default_client_cc "public, max-age=60, stale-while-revalidate=300"
 
   @impl true
   def init(opts), do: opts
@@ -54,18 +73,16 @@ defmodule KeenPhoenixSvelte.Apps.Proxy do
         conn |> send_resp(404, "unknown app") |> halt()
 
       url ->
-        serve(conn, url)
+        serve(conn, name, url)
     end
   end
 
-  defp serve(conn, url) do
-    case cached_get_bundle(url) do
-      {:ok, body} ->
-        conn
-        # Force a module-friendly type regardless of what upstream reports.
-        |> put_resp_content_type("text/javascript")
-        |> put_resp_header("cache-control", "public, max-age=31536000, immutable")
-        |> send_resp(200, body)
+  defp serve(conn, name, url) do
+    opts = Apps.proxy_opts(name)
+
+    case ProxyCache.get(url, opts) do
+      {:ok, entry} ->
+        respond(conn, entry, opts)
 
       {:error, reason} ->
         Logger.error("[keen_phoenix_svelte] app proxy failed for #{url}: #{inspect(reason)}")
@@ -73,39 +90,37 @@ defmodule KeenPhoenixSvelte.Apps.Proxy do
     end
   end
 
-  defp cached_get_bundle(url) do
-    key = {__MODULE__, url}
+  defp respond(conn, entry, opts) do
+    conn = put_validators(conn, entry, opts)
 
-    case :persistent_term.get(key, nil) do
-      nil ->
-        with {:ok, body} <- get_bundle(url) do
-          :persistent_term.put(key, body)
-          {:ok, body}
-        end
-
-      body ->
-        {:ok, body}
+    if browser_current?(conn, entry) do
+      conn |> send_resp(304, "") |> halt()
+    else
+      conn
+      # Force a module-friendly type regardless of what upstream reports.
+      |> put_resp_content_type("text/javascript")
+      |> send_resp(200, entry.body)
     end
   end
 
-  defp get_bundle(url) do
-    case Application.get_env(:keen_phoenix_svelte, :app_provider) do
-      fun when is_function(fun, 1) -> fun.(url)
-      _ -> httpc_get_bundle(url)
-    end
+  defp put_validators(conn, entry, opts) do
+    conn
+    |> put_resp_header("cache-control", client_cache_control(opts))
+    |> maybe_put_etag(entry.etag)
   end
 
-  defp httpc_get_bundle(url) do
-    {:ok, _} = Application.ensure_all_started(:inets)
-    {:ok, _} = Application.ensure_all_started(:ssl)
+  defp maybe_put_etag(conn, nil), do: conn
+  defp maybe_put_etag(conn, etag), do: put_resp_header(conn, "etag", etag)
 
-    request = {String.to_charlist(url), [{~c"accept", ~c"*/*"}]}
-    http_opts = [autoredirect: true, timeout: 10_000, connect_timeout: 5_000]
+  defp client_cache_control(%{immutable: true}), do: @immutable
+  defp client_cache_control(%{client_cache_control: cc}) when is_binary(cc), do: cc
+  defp client_cache_control(_opts), do: @default_client_cc
 
-    case :httpc.request(:get, request, http_opts, body_format: :binary) do
-      {:ok, {{_v, 200, _r}, _headers, body}} -> {:ok, body}
-      {:ok, {{_v, status, _r}, _headers, _body}} -> {:error, {:status, status}}
-      {:error, reason} -> {:error, reason}
-    end
+  defp browser_current?(_conn, %{etag: nil}), do: false
+
+  defp browser_current?(conn, %{etag: etag}) do
+    conn
+    |> get_req_header("if-none-match")
+    |> Enum.any?(&(&1 == etag or &1 == "*"))
   end
 end

@@ -36,11 +36,18 @@ defmodule KeenPhoenixSvelte.Apps do
         proxy_path: "/apps",
         # local apps load from here
         base_path: "/apps",
+        # server-side proxy cache (see `KeenPhoenixSvelte.Apps.Proxy`)
+        proxy_cache: [
+          ttl: :timer.minutes(5),   # freshness fallback when the origin sends no cache directives
+          respect_upstream: true,   # honor upstream Cache-Control / ETag / Last-Modified
+          client_cache_control: "public, max-age=60, stale-while-revalidate=300"
+        ],
         apps: %{
           # a plain URL uses the global load_mode:
           "org-chart" => "https://cdn.acme.com/islands/org-chart@1.4.2/main.mjs",
-          # or override per app:
-          "report" => %{url: "https://reports.internal/report/main.mjs", mode: :direct}
+          # or override per app (per-app `ttl`/`immutable` tune the proxy cache):
+          "report" => %{url: "https://reports.internal/report/main.mjs", mode: :direct},
+          "pinned" => %{url: "https://cdn.acme.com/pinned@2.0.0/main.mjs", immutable: true}
         }
 
   The registry can just as well come from a database — build the same map at
@@ -59,8 +66,8 @@ defmodule KeenPhoenixSvelte.Apps do
   @spec base_path() :: String.t()
   def base_path, do: get(:base_path, "/apps")
 
-  @doc "The registered apps, normalized to `%{name => %{url: url, mode: mode}}`."
-  @spec registered() :: %{optional(String.t()) => %{url: String.t(), mode: :direct | :proxy}}
+  @doc "The registered apps, normalized to `%{name => %{url, mode, ttl, immutable}}`."
+  @spec registered() :: %{optional(String.t()) => map()}
   def registered do
     :keen_phoenix_svelte
     |> Application.get_env(:apps, %{})
@@ -92,17 +99,44 @@ defmodule KeenPhoenixSvelte.Apps do
     end
   end
 
+  @doc """
+  The resolved proxy-cache options for `name`, merging the per-app registry entry
+  over the global `:proxy_cache` config. Consumed by `KeenPhoenixSvelte.Apps.Proxy`.
+  """
+  @spec proxy_opts(String.t()) :: %{
+          ttl_ms: non_neg_integer(),
+          respect_upstream: boolean(),
+          immutable: boolean(),
+          client_cache_control: String.t() | nil,
+          freshness: (map() -> non_neg_integer()) | nil
+        }
+  def proxy_opts(name) do
+    spec = registered()[to_string(name)] || %{}
+    cfg = get(:proxy_cache, [])
+
+    %{
+      ttl_ms: spec[:ttl] || cfg[:ttl] || :timer.minutes(5),
+      respect_upstream: Keyword.get(cfg, :respect_upstream, true),
+      immutable: spec[:immutable] || false,
+      client_cache_control: cfg[:client_cache_control],
+      freshness: cfg[:freshness]
+    }
+  end
+
   # ---------------------------------------------------------------------------
 
   defp client_url(_name, url, :direct), do: url
   defp client_url(name, _url, :proxy), do: proxy_path() <> "/" <> name
 
-  defp normalize(url) when is_binary(url), do: %{url: url, mode: load_mode()}
+  defp normalize(url) when is_binary(url),
+    do: %{url: url, mode: load_mode(), ttl: nil, immutable: false}
 
   defp normalize(%{} = spec) do
     %{
       url: spec[:url] || spec["url"],
-      mode: spec[:mode] || spec["mode"] || load_mode()
+      mode: spec[:mode] || spec["mode"] || load_mode(),
+      ttl: spec[:ttl] || spec["ttl"],
+      immutable: spec[:immutable] || spec["immutable"] || false
     }
   end
 
