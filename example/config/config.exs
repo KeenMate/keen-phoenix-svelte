@@ -50,6 +50,21 @@ config :logger, :default_formatter,
 # Use Jason for JSON parsing in Phoenix
 config :phoenix, :json_library, Jason
 
+# keen_phoenix_svelte app registry — demonstrates loading an island whose bundle
+# lives *outside* the normal /apps pipeline (here, a hand-written file under
+# /external). Base config loads it :direct (same-origin, always works); dev.exs
+# flips it to :proxy to show the server fetching + re-serving it. See
+# KeenPhoenixSvelte.Apps.
+config :keen_phoenix_svelte,
+  apps: %{
+    "greeter" => "/external/greeter/main.mjs"
+  },
+  # Server-wide island loader. The placeholder is server-rendered into the page
+  # (so it can use the app's own daisyUI/Tailwind) and the client clears it the
+  # instant the bundle mounts — no flash of empty container. Any island can
+  # override this with a <:placeholder> slot.
+  placeholder: ~s|<div class="skeleton h-full min-h-[3rem] w-full rounded-lg"></div>|
+
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.
 import_config "#{config_env()}.exs"

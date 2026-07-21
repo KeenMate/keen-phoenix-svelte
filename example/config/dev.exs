@@ -1,5 +1,16 @@
 import Config
 
+# In dev, deliver the external `greeter` island via the same-origin PROXY: the
+# browser imports /keen-islands/greeter and the server fetches the real bundle
+# upstream (here, our own /external file — stand-in for a CDN). This is the
+# CSP/CORS-friendly corporate mode. Flip load_mode to :direct to have the browser
+# fetch the upstream URL itself.
+config :keen_phoenix_svelte,
+  load_mode: :proxy,
+  apps: %{
+    "greeter" => "http://localhost:4000/external/greeter/main.mjs"
+  }
+
 # For development, we disable any cache and enable
 # debugging and code reloading.
 #

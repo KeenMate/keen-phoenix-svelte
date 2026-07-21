@@ -62,6 +62,12 @@ defmodule ExampleWeb.Router do
     get "/v1.0/me/calendarView", MockGraphController, :calendar_view
   end
 
+  # Same-origin island proxy (KeenPhoenixSvelte `:proxy` mode). A request to
+  # /keen-islands/<name> is fetched upstream by the server and re-served here —
+  # so an external/CDN bundle isn't subject to CORS or a strict CSP. The `greeter`
+  # demo app is registered in config; in dev it's proxied, in prod loaded direct.
+  forward "/keen-islands", KeenPhoenixSvelte.IslandProxy
+
   # Enable LiveDashboard in development
   if Application.compile_env(:example, :dev_routes) do
     import Phoenix.LiveDashboard.Router

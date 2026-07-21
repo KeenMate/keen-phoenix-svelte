@@ -55,7 +55,17 @@ defmodule ExampleWeb.HomeLive do
   ]
 
   def mount(_params, _session, socket) do
-    {:ok, assign(socket, areas: @areas, boundary: @boundary, page_title: "Welcome")}
+    # Only show the external-island demo when a "greeter" app is registered
+    # (config-driven). Lets prod omit it cleanly if it isn't configured.
+    greeter? = Map.has_key?(KeenPhoenixSvelte.Apps.manifest(), "greeter")
+
+    {:ok,
+     assign(socket,
+       areas: @areas,
+       boundary: @boundary,
+       greeter?: greeter?,
+       page_title: "Welcome"
+     )}
   end
 
   def render(assigns) do
@@ -135,6 +145,70 @@ defmodule ExampleWeb.HomeLive do
           </div>
         </section>
 
+        <%!-- Any framework — same boundary --%>
+        <section>
+          <h2 class="text-xl font-semibold">Any framework — same boundary</h2>
+          <p class="text-base-content/60 mt-1">
+            The three areas above are <strong>Svelte</strong>, but the mount contract is
+            framework-neutral. Below are three more islands — Lit, React and vanilla JS —
+            each mounted through the same <code>&lt;.app&gt;</code>
+            component. There are no per-framework variants; the optional <code>framework</code>
+            attribute is just an informational <code>data-framework</code>
+            tag. Click them — they all reach the activity bus.
+          </p>
+          <p class="text-base-content/50 text-sm mt-1">
+            Each passes its own <code>&lt;:placeholder&gt;</code>
+            shaped like the control it's loading — a pill for Kudos, four buttons for
+            reactions, a bar for the ticker — instead of the server-wide skeleton. Throttle
+            your network (DevTools → Slow 3G) and reload to watch them resolve.
+          </p>
+
+          <div class="grid gap-4 sm:grid-cols-3 mt-5">
+            <div class="card bg-base-100 border border-base-300 rounded-lg p-5">
+              <code class="text-xs text-primary">&lt;.app framework="lit"&gt;</code>
+              <div class="mt-3">
+                <.app name="kudos-lit" id="kudos-lit-app" framework="lit" props={%{label: "Kudos"}}>
+                  <:placeholder>
+                    <div class="skeleton h-9 w-32 rounded-full"></div>
+                  </:placeholder>
+                </.app>
+              </div>
+              <p class="text-sm text-base-content/60 mt-3">
+                A Lit web component (shadow-DOM styles).
+              </p>
+            </div>
+
+            <div class="card bg-base-100 border border-base-300 rounded-lg p-5">
+              <code class="text-xs text-primary">&lt;.app framework="react"&gt;</code>
+              <div class="mt-3">
+                <.app name="reactions-react" id="reactions-react-app" framework="react" props={%{}}>
+                  <:placeholder>
+                    <div class="flex gap-2">
+                      <div class="skeleton h-9 w-14 rounded-lg"></div>
+                      <div class="skeleton h-9 w-14 rounded-lg"></div>
+                      <div class="skeleton h-9 w-14 rounded-lg"></div>
+                      <div class="skeleton h-9 w-14 rounded-lg"></div>
+                    </div>
+                  </:placeholder>
+                </.app>
+              </div>
+              <p class="text-sm text-base-content/60 mt-3">React 18 + hooks, JSX built by esbuild.</p>
+            </div>
+
+            <div class="card bg-base-100 border border-base-300 rounded-lg p-5">
+              <code class="text-xs text-primary">&lt;.app framework="js"&gt;</code>
+              <div class="mt-3">
+                <.app name="hello-js" id="hello-js-app" framework="js" props={%{}}>
+                  <:placeholder>
+                    <div class="skeleton h-14 w-full rounded-lg"></div>
+                  </:placeholder>
+                </.app>
+              </div>
+              <p class="text-sm text-base-content/60 mt-3">Plain JavaScript — no framework at all.</p>
+            </div>
+          </div>
+        </section>
+
         <%!-- Event bus + activity toasts (the highlight) --%>
         <section class="card bg-base-100 border border-base-300 rounded-xl p-6">
           <div class="flex items-center gap-2">
@@ -180,6 +254,35 @@ defmodule ExampleWeb.HomeLive do
             or <.link navigate={~p"/calendar"} class="link link-primary">join a meeting</.link>
             and watch the toast fire in the corner — three separate bundles, coordinating over the bus.
           </p>
+        </section>
+
+        <%!-- Externally-loaded island (app registry + proxy vs direct) --%>
+        <section :if={@greeter?} class="card bg-base-100 border border-base-300 rounded-xl p-6">
+          <div class="flex items-center gap-2">
+            <.icon name="hero-globe-alt" class="size-6 text-primary" />
+            <h2 class="text-lg font-semibold">An island loaded from elsewhere</h2>
+          </div>
+          <p class="mt-2 text-base-content/70">
+            Islands don't have to live under <code>/apps</code>. The one below is a
+            framework-free bundle registered in config; the server emits a <code>name → url</code>
+            manifest and the client imports it from there. A config toggle picks the <strong>mode of operation</strong>:
+          </p>
+          <ul class="mt-2 text-sm text-base-content/70 list-disc pl-5 space-y-1">
+            <li>
+              <code>:direct</code>
+              — the browser imports the CDN URL itself (needs CORS + a permissive CSP).
+            </li>
+            <li>
+              <code>:proxy</code>
+              — the browser imports a same-origin path and Phoenix fetches the bundle
+              upstream (<code>KeenPhoenixSvelte.IslandProxy</code>) — no CORS, CSP <code>'self'</code>, the corporate-friendly mode.
+              <strong>Active here in dev.</strong>
+            </li>
+          </ul>
+
+          <div class="mt-4">
+            <.svelte name="greeter" id="greeter-app" props={%{via: "the app registry (proxy mode)"}} />
+          </div>
         </section>
 
         <%!-- Plain pages --%>
