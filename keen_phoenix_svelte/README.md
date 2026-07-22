@@ -31,6 +31,15 @@ mounts Svelte, Lit, React and vanilla-JS islands through it.
 > **[Philosophy & comparison](docs/philosophy.md)** — the autonomous-island model,
 > what this deliberately doesn't do, and how it differs from `live_svelte`.
 
+## What's New in v1.0.0-rc.4
+
+- **Base-path proxy — proxy a whole multi-file bundle** — A registered app can name an upstream *directory* with `base:` (+ optional `entry:`); every sub-path re-serves same-origin, so a vendor bundle's JS entry plus its stylesheet, fonts, and images all proxy through one registration.
+- **Local `dir:` source — serve a content-hashed bundle from disk** — Point an app at a local directory (a mounted volume another process rebuilds) with an `entry:` glob; the newest match wins, so `bundle.a1b2c3.js` resolves without knowing the hash. It reuses the proxy cache — the file's mtime is the validator, `:ttl` the re-scan cadence.
+- **Unified app manifest — local and registered apps in one map** — `Apps.manifest/0` now merges folder-detected local apps with registered ones (set `otp_app:` so the library can locate them). One authoritative map for the client, `preload`, and tooling; a registered entry wins on a name clash.
+- **`<.runtime preload={…}>` — fetch island bundles during initial HTML parse** — Emit `<link rel="modulepreload">` for on-page islands so the browser downloads them in parallel instead of waiting for the LiveView hook's lazy `import()`. Cross-origin bundles get `crossorigin` so the preload is actually reused.
+- **One island component, `<.app>`** — The `<.svelte>` alias is removed; every island (Svelte, React, Lit, vanilla) mounts through the single framework-neutral `<.app>`. In your `Layouts` module (which defines its own `app/1`), call it fully-qualified as `<KeenPhoenixSvelte.app>`.
+- **Docs — one authoring guide, a packaging litmus, and diagrams** — "Authoring apps" now covers building an island in *any* framework (Vite library mode + React/Lit/Vue/vanilla recipes); a new "Island-able vs page-owning apps" guide draws the line on what can be an island; and the guides render Mermaid diagrams of how apps resolve and load.
+
 ## What's New in v1.0.0-rc.3
 
 - **Proxy cache with revalidation — `:proxy` mode now works for unversioned upstreams** — Registered proxied bundles are cached in ETS and *revalidated* rather than pinned forever: a stale entry triggers a single-flight conditional `GET` (`If-None-Match`/`If-Modified-Since`), so a `304` keeps the bytes and a `200` swaps them, with concurrent requests collapsed into one upstream fetch. Freshness follows the upstream's `Cache-Control`/`ETag`, falling back to a `:ttl` (default 5 min) — so a bare `cdn/app.js` with no version in its URL is re-checked on a cadence instead of cached for a year.
@@ -38,14 +47,6 @@ mounts Svelte, Lit, React and vanilla-JS islands through it.
 - **Bounded proxy memory** — Cache entries upsert by URL (refreshes never grow the table) and a periodic sweep evicts URLs no longer in the registry, so a rotating DB-driven app registry stays bounded to its working set.
 - **Renamed to speak "app", not "island"** — `KeenPhoenixSvelte.IslandProxy` → `KeenPhoenixSvelte.Apps.Proxy`, config `:island_provider` → `:app_provider` (which now also accepts a 2-arity conditional-fetch form), and the proxy-path default `/keen-islands` → `/apps` (it shares the `base_path` prefix). Update your router `forward`.
 - **Package metadata / links** — corrected the `:source_url` casing, added `homepage_url`, and a `Website` link to the live demo.
-
-## What's New in v1.0.0-rc.2
-
-- **Framework-neutral `<.app>` — one component mounts any island** — Every island mounts through the same `(target, opts) => { setProps, destroy }` contract, so there is now a single `app/1` component regardless of whether the bundle is Svelte, Lit, React, or hand-written vanilla JS. An optional `framework` attribute just emits an informational `data-framework` tag.
-- **Placeholder / loader — no flash of empty container** — `<.app>` renders a placeholder that the client clears the instant the bundle mounts (after the fetch, so it stays visible the whole time). Resolution is a per-call `<:placeholder>` slot › the server-wide `config :keen_phoenix_svelte, :placeholder` › a built-in, dependency-free skeleton. The server default accepts an HTML string, a function, `{mod, fun}`, or `false` to disable.
-- **Event bus — island-to-island messaging without the server** — A `bus` joins the app boundary: a page-wide, client-side pub/sub (`emit`/`on`/`once`) over a DOM `EventTarget`, wired into both the LiveView hook and `mountStatic()`, so independent islands coordinate without a round-trip and without importing each other.
-- **External apps — a registry with `:direct`/`:proxy` delivery** — `KeenPhoenixSvelte.Apps` registers islands whose bundle lives elsewhere (a CDN, another deploy); `<.runtime>` emits a `name → url` manifest and `AppsManager.resolve/1` loads them. Pick `:direct` (browser imports the CDN URL) or `:proxy` (Phoenix fetches and re-serves same-origin via `KeenPhoenixSvelte.Apps.Proxy` — no CORS, CSP `'self'`).
-- **Example reworked into "KeenSpace"** — the demo is now a Teams-style workspace that doubles as reference code: chat over channel + Presence, a video catalogue over the REST helper, a calendar over `context.tokens`, a bus-driven activity toast, simulated i18n, a plain (non-LiveView) route, and Lit/React/vanilla islands alongside the Svelte ones.
 
 ## How it works
 
