@@ -26,6 +26,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   while JS is still forced to a module-friendly type regardless of what the origin
   reports.
 
+**Unified app manifest — local + registered apps in one map**
+- The client manifest (`Apps.manifest/0`, emitted as `#keen-apps`) now **merges**
+  detected **local** apps with **registered** ones. Local apps are found by
+  scanning `priv/static/<base_path>/<name>/main.mjs` — set
+  `config :keen_phoenix_svelte, otp_app: :my_app` so the library can locate the
+  static dir (or point `:apps_static_path` at it directly). Registered entries
+  override local ones on a name clash. Without `:otp_app` behavior is unchanged —
+  the client still resolves local apps by the naming convention; the manifest entry
+  only adds them to `preload` and server-side visibility. New `Apps.local_apps/0`.
+- Docs render **Mermaid** diagrams (enabled in ex_doc): external-apps now shows the
+  resolution flow (two sources → one manifest → client `import`) and the lazy
+  load/preload timeline.
+
+**`<.runtime preload={…}>` — fetch island bundles during initial HTML parse**
+- `KeenPhoenixSvelte.runtime` gained a `preload` attribute that emits
+  `<link rel="modulepreload">` for app bundles, so the browser downloads them in
+  parallel with the page instead of waiting for the LiveView hook to fire the
+  lazy `import()` (which on a LiveView can't run until the socket connects). Accepts
+  a **list of app names** (scope it to the islands on this page; registered apps use
+  their manifest URL, an unregistered local app falls back to
+  `base_path/<name>/main.mjs`) or `true` (every manifest app); default `false`.
+  A cross-origin (`:direct`) URL gets `crossorigin="anonymous"` so the preload's
+  credentials mode matches the module import and the fetch is actually reused.
+
 **Local `dir:` source — proxy a content-hashed bundle from a directory on disk**
 - A registered app can now name a **local directory** with `dir:` (a mounted
   volume another process rebuilds) instead of a remote `url:`/`base:`. The `entry:`

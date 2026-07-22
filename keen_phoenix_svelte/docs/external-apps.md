@@ -12,6 +12,56 @@ a database-driven catalogue.
 > [Island-able vs page-owning apps](packaging-apps.md) for how to tell, and what to
 > do instead.
 
+## How an app's URL is resolved
+
+Two sources feed **one** `name → url` manifest, and the client reads it to decide
+where to `import()` each bundle. **Local** apps are discovered by folder at build
+time; **registered** apps come from config (registered wins on a name clash):
+
+```mermaid
+flowchart TD
+  A["assets/apps folders"] -->|Vite build| B["priv/static/apps main.mjs"]
+  B -.->|otp_app scan| M
+  C["config apps: registered"] --> M["Apps.manifest — name to url"]
+  M -->|runtime component| K["keen-apps JSON in page"]
+  K --> R{"name in manifest?"}
+  R -->|yes| U["import manifest url"]
+  R -->|no| F["import /apps/name/main.mjs"]
+```
+
+*(local folders and registered config merge into one manifest — registered wins on
+a name clash; the "no" branch is the convention fallback when `:otp_app` is unset.)*
+
+The fallback exists so local apps work **even without** `:otp_app` — the client
+derives the same `/apps/<name>/main.mjs` URL by convention. Setting `:otp_app` just
+lifts local apps *into* the manifest, so they're visible server-side (for
+[`preload`](KeenPhoenixSvelte.html#runtime/1-preloading-bundles) and tooling)
+instead of only being resolvable by the naming convention.
+
+## When the bundle actually loads
+
+The bundle is fetched **lazily** — the `import()` runs in the hook's `mounted()`,
+which on a LiveView can't happen until the socket connects and the view mounts. So
+the download starts well into the page load. `preload` moves the *download* (not
+the render) up to initial HTML parse:
+
+```mermaid
+sequenceDiagram
+  participant B as Browser
+  participant P as Phoenix
+  B->>P: GET page
+  P-->>B: HTML with keen-apps manifest
+  Note over B: parse HTML
+  opt preload set
+    B->>P: modulepreload fetches bundle in parallel
+  end
+  B->>P: connect LiveView socket
+  P-->>B: join, mount, patch DOM
+  Note over B: KeenSvelte.mounted runs
+  B->>P: import bundle (instant if preloaded)
+  Note over B: mount, first render
+```
+
 ## The one thing that changes: the URL
 
 `AppsManager.resolve(name)` decides where to import a bundle from. The server

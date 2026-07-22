@@ -28,7 +28,9 @@
           graph: Phoenix.Token.sign(ExampleWeb.Endpoint, "graph token", @current_user.id)
         }
       }
-    } />
+    }
+      preload={assigns[:preload_apps] || false}
+    />
     <.live_title default={site_name()} suffix={" · " <> site_name()}>
       {assigns[:page_title]}
     </.live_title>

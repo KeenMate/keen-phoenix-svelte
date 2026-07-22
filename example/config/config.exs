@@ -56,6 +56,10 @@ config :phoenix, :json_library, Jason
 # flips it to :proxy to show the server fetching + re-serving it. See
 # KeenPhoenixSvelte.Apps.
 config :keen_phoenix_svelte,
+  # Lets the library detect this app's local island folders (built to
+  # priv/static/apps/<name>/main.mjs) and merge them into the manifest alongside
+  # the registered apps below — so `preload` and #keen-apps see every island.
+  otp_app: :example,
   apps: %{
     "greeter" => "/external/greeter/main.mjs",
     # Two islands hosted on a GENUINELY external CDN

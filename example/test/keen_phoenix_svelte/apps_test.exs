@@ -7,10 +7,19 @@ defmodule KeenPhoenixSvelte.AppsTest do
   setup do
     orig_apps = Application.get_env(:keen_phoenix_svelte, :apps)
     orig_mode = Application.get_env(:keen_phoenix_svelte, :load_mode)
+    orig_otp = Application.get_env(:keen_phoenix_svelte, :otp_app)
+    orig_path = Application.get_env(:keen_phoenix_svelte, :apps_static_path)
+
+    # Turn off local-app detection by default so manifest assertions are about the
+    # registered apps only; the merge tests opt back in with :apps_static_path.
+    Application.delete_env(:keen_phoenix_svelte, :otp_app)
+    Application.delete_env(:keen_phoenix_svelte, :apps_static_path)
 
     on_exit(fn ->
       restore(:apps, orig_apps)
       restore(:load_mode, orig_mode)
+      restore(:otp_app, orig_otp)
+      restore(:apps_static_path, orig_path)
     end)
 
     :ok
@@ -133,6 +142,62 @@ defmodule KeenPhoenixSvelte.AppsTest do
     assert %{immutable: true} = Apps.proxy_opts("pinned")
   end
 
-  defp restore(_key, nil), do: :ok
+  test "local apps are detected and merged into the manifest with convention URLs" do
+    dir = tmp_apps_dir(["chat", "videos"])
+    Application.put_env(:keen_phoenix_svelte, :apps_static_path, dir)
+
+    Application.put_env(:keen_phoenix_svelte, :apps, %{
+      "metrics" => %{url: "https://cdn/m.mjs", mode: :direct}
+    })
+
+    assert Apps.local_apps() == ["chat", "videos"]
+
+    manifest = Apps.manifest()
+    # local folders → the convention URL the client would fall back to
+    assert manifest["chat"] == "/apps/chat/main.mjs"
+    assert manifest["videos"] == "/apps/videos/main.mjs"
+    # ...merged with the registered (external) app
+    assert manifest["metrics"] == "https://cdn/m.mjs"
+  end
+
+  test "a registered app overrides a same-named local folder" do
+    dir = tmp_apps_dir(["chat"])
+    Application.put_env(:keen_phoenix_svelte, :apps_static_path, dir)
+    # Explicit :direct so the manifest URL is the CDN one regardless of any
+    # load_mode left set by an earlier (serial) test.
+    Application.put_env(:keen_phoenix_svelte, :apps, %{"chat" => %{url: "https://cdn/chat.mjs", mode: :direct}})
+
+    assert Apps.manifest()["chat"] == "https://cdn/chat.mjs"
+  end
+
+  test "a folder without main.mjs is not a local app" do
+    dir = tmp_apps_dir(["real"])
+    File.mkdir_p!(Path.join(dir, "empty"))
+    Application.put_env(:keen_phoenix_svelte, :apps_static_path, dir)
+
+    assert Apps.local_apps() == ["real"]
+  end
+
+  test "local detection is off without :otp_app / :apps_static_path" do
+    Application.put_env(:keen_phoenix_svelte, :apps, %{})
+    assert Apps.local_apps() == []
+    assert Apps.manifest() == %{}
+  end
+
+  defp tmp_apps_dir(names) do
+    base = Path.join(System.tmp_dir!(), "kps-apps-#{System.unique_integer([:positive])}")
+
+    Enum.each(names, fn name ->
+      File.mkdir_p!(Path.join(base, name))
+      File.write!(Path.join([base, name, "main.mjs"]), "export default 0;")
+    end)
+
+    on_exit(fn -> File.rm_rf(base) end)
+    base
+  end
+
+  # Reset to the original state: delete when it was unset (so a value set mid-test
+  # doesn't leak into the next serial test), else put the original back.
+  defp restore(key, nil), do: Application.delete_env(:keen_phoenix_svelte, key)
   defp restore(key, val), do: Application.put_env(:keen_phoenix_svelte, key, val)
 end

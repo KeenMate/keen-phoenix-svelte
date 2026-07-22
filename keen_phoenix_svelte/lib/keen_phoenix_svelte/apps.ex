@@ -26,6 +26,9 @@ defmodule KeenPhoenixSvelte.Apps do
   ## Configuration
 
       config :keen_phoenix_svelte,
+        # your app, so local apps under priv/static/<base_path> are detected and
+        # merged into the manifest (enables `preload` + server-side visibility).
+        otp_app: :my_app,
         # global default mode for registered apps
         load_mode: :proxy,
         # where proxied bundles are served from (must match your router forward).
@@ -86,16 +89,59 @@ defmodule KeenPhoenixSvelte.Apps do
   end
 
   @doc """
-  The client manifest — `%{name => url_the_browser_imports}`.
+  The client manifest — `%{name => url_the_browser_imports}` — merging **detected
+  local apps** with **registered** ones.
 
-  Emitted into the page by `<KeenPhoenixSvelte.runtime>` and read by
-  `AppsManager`. In `:proxy` mode the URL is a same-origin `proxy_path/<name>`
-  (for a base-path app, `proxy_path/<name>/<entry>`); in `:direct` mode it is the
-  configured CDN URL (or `<base>/<entry>`).
+  Emitted into the page by `<KeenPhoenixSvelte.runtime>` and read by `AppsManager`.
+  Two sources are collected into one map:
+
+    * **local apps** (`local_apps/0`) — folders built to
+      `priv/static/<base_path>/<name>/main.mjs`. Each maps to its convention URL
+      `base_path/<name>/main.mjs` (the same URL the client would fall back to).
+    * **registered apps** (`registered/0`) — the `:apps` config, whose URL points
+      elsewhere (CDN `:direct`, same-origin `:proxy`, a base-path or local `dir:`).
+
+  Registered entries **override** local ones on a name clash (so registering an app
+  to a CDN wins over a stray same-named folder). For a registered app the URL is:
+  in `:proxy` mode a same-origin `proxy_path/<name>` (base-path app:
+  `proxy_path/<name>/<entry>`); in `:direct` mode the configured CDN URL (or
+  `<base>/<entry>`).
+
+  Local detection requires `config :keen_phoenix_svelte, otp_app: :my_app` so the
+  library can locate your static dir; without it only registered apps appear (the
+  client still resolves local apps by the same convention — the manifest entry only
+  adds them to `preload` and server-side visibility).
   """
   @spec manifest() :: %{optional(String.t()) => String.t()}
   def manifest do
-    Map.new(registered(), fn {name, spec} -> {name, client_url(name, spec)} end)
+    registered_map = Map.new(registered(), fn {name, spec} -> {name, client_url(name, spec)} end)
+    Map.merge(local_manifest(), registered_map)
+  end
+
+  @doc """
+  Names of **local** apps — subdirectories of the built static apps dir that
+  contain a `main.mjs`. Needs no per-app registration (they're discovered by
+  folder), but the library must be told where to look via
+  `config :keen_phoenix_svelte, otp_app: :my_app` (its `priv/static/<base_path>`),
+  or an explicit `:apps_static_path`. Returns `[]` when neither is set.
+  """
+  @spec local_apps() :: [String.t()]
+  def local_apps do
+    case local_apps_dir() do
+      nil ->
+        []
+
+      dir ->
+        case File.ls(dir) do
+          {:ok, entries} ->
+            entries
+            |> Enum.filter(&File.regular?(Path.join([dir, &1, "main.mjs"])))
+            |> Enum.sort()
+
+          _ ->
+            []
+        end
+    end
   end
 
   @doc "The upstream URL the proxy should fetch for a single-file app, or `nil` if unknown/not proxied."
@@ -183,6 +229,31 @@ defmodule KeenPhoenixSvelte.Apps do
   end
 
   # ---------------------------------------------------------------------------
+
+  # Local apps → `%{name => convention_url}`. The URL is exactly what the client
+  # would fall back to, so adding it to the manifest changes nothing about how the
+  # app mounts — it just makes local apps visible server-side (for `preload`, etc.).
+  defp local_manifest do
+    Map.new(local_apps(), fn name -> {name, base_path() <> "/" <> name <> "/main.mjs"} end)
+  end
+
+  # Where built local bundles live: an explicit `:apps_static_path`, else the
+  # `:otp_app`'s `priv/static/<base_path>`. `nil` disables local detection.
+  defp local_apps_dir do
+    case get(:apps_static_path, nil) do
+      path when is_binary(path) ->
+        path
+
+      _ ->
+        case get(:otp_app, nil) do
+          otp when is_atom(otp) and not is_nil(otp) ->
+            Application.app_dir(otp, Path.join(["priv", "static", String.trim_leading(base_path(), "/")]))
+
+          _ ->
+            nil
+        end
+    end
+  end
 
   # The URL the browser imports for an app: the CDN URL in :direct mode, a
   # same-origin proxy path in :proxy mode (base apps point at their entry file).

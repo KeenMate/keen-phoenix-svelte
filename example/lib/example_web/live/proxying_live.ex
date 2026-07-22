@@ -77,6 +77,11 @@ defmodule ExampleWeb.ProxyingLive do
        hello?: hello?,
        metrics?: metrics?,
        watch: watch,
+       # Preload the on-page island bundles during initial HTML parse (via
+       # <link rel="modulepreload">), so the browser fetches them in parallel
+       # instead of waiting for the LiveView hook to fire the import(). Read by
+       # <KeenPhoenixSvelte.runtime> in the root layout.
+       preload_apps: Enum.map(watch, & &1.name),
        page_title: "Proxying"
      )}
   end
