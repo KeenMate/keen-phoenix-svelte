@@ -28,7 +28,7 @@ config :keen_phoenix_svelte,
 ```
 
 ```heex
-<.svelte name="org-chart" id="org-chart" props={%{unit: @unit_id}} />
+<.app name="org-chart" id="org-chart" props={%{unit: @unit_id}} />
 ```
 
 The registry is just data — build the same map from a database at runtime and set
@@ -138,6 +138,47 @@ one-file case.
 > thin adapter entry that imports the vendor files (now same-origin) and adapts
 > them to `(target, opts) => { setProps, destroy }`. Base-path proxying is what
 > gets all those files delivered.
+
+## Local folder: a content-hashed bundle on a volume
+
+Sometimes the bundle isn't remote at all — it's dropped onto a **filesystem** the
+Phoenix node can see: a mounted volume (`/apps` in a container) that a *separate*
+process rebuilds and replaces. If that process emits a **content-hashed** entry
+(`bundle.a1b2c3.js`, the usual Vite output), you can't hard-code the name — it
+changes every build. A `dir:` app resolves it by **glob** instead:
+
+```elixir
+config :keen_phoenix_svelte,
+  apps: %{
+    # `entry:` is a glob; the NEWEST match wins, so a rebuilt hash is picked up
+    # without anyone knowing it. Served same-origin through the proxy plug.
+    "dash" => %{dir: "/srv/apps/dash", entry: "bundle.*.js", ttl: :timer.seconds(30)}
+  }
+```
+
+The client imports a bare, stable `/apps/dash` (never the hashed name); the proxy
+globs the directory at request time, serves the newest file, and any sibling the
+bundle references (`import.meta.url` → `/apps/dash/chunk.xyz.js`) is served as a
+literal file under the same prefix.
+
+Crucially this **reuses the same cache** as the URL proxy — there's no second
+mechanism. The only thing that changes is the source: instead of a conditional
+HTTP `GET`, freshness is a `File.stat`, and the file's signature (name + mtime +
+size) plays the role the upstream `ETag` plays for a URL. Unchanged file → the
+equivalent of a `304`, cached bytes kept; a newer file → new bytes + a fresh
+weak `ETag`. The `:ttl` is simply *how often the folder is re-scanned* (within it,
+reads are pure ETS — no filesystem access), and `immutable: true` pins it. A weak
+`ETag` is still emitted to the browser, so the browser → Phoenix `304` chain works
+exactly as with a URL.
+
+Two constraints:
+
+- **Local only.** You can't glob a URL (HTTP has no directory listing), so `dir:`
+  requires a path on disk. Remote hashed bundles need the upstream to publish a
+  manifest you register against, or a stable (unhashed) filename.
+- **Ambiguity → newest wins.** If a deploy leaves both the old and new hash in the
+  folder, the most-recently-modified file is chosen. Have the writer swap
+  atomically (write-then-`rename`) so a half-written file is never globbed.
 
 ## Notes
 

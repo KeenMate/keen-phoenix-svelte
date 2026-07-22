@@ -40,24 +40,24 @@ See [Authoring apps](authoring-apps.md) for what goes in each folder.
 
 ## 2. The page — drop in the mount points
 
-Each app is one `<.svelte>` tag. `name` picks the folder; `id` must be unique and
+Each app is one `<.app>` tag. `name` picks the folder; `id` must be unique and
 stable; `props` is small **config, not payload** — an org id, a date range, a
 count — never the data itself.
 
 ```heex
 <!-- lib/my_app_web/live/dashboard_live.ex (render/1) -->
 <div class="dashboard">
-  <.svelte name="kpi-cards" id="kpi-cards" props={%{team_id: @team_id}} />
+  <.app name="kpi-cards" id="kpi-cards" props={%{team_id: @team_id}} />
 
-  <.svelte
+  <.app
     name="org-browser"
     id="org-browser"
     props={%{root_id: @team_id, depth: 3}}
   />
 
-  <.svelte name="graph-calendar" id="graph-calendar" props={%{days: 7}} />
+  <.app name="graph-calendar" id="graph-calendar" props={%{days: 7}} />
 
-  <.svelte
+  <.app
     name="activity-feed"
     id="activity-feed"
     props={%{team_id: @team_id, page_size: 25}}
@@ -65,7 +65,7 @@ count — never the data itself.
 </div>
 ```
 
-That's the whole server side. Each `<.svelte>` renders a hook-bound `<div>` with
+That's the whole server side. Each `<.app>` renders a hook-bound `<div>` with
 `phx-update="ignore"`, `data-app`, and JSON `data-props`. When the page loads,
 `AppsManager` `import()`s **only** these four bundles — an app you don't place is
 never fetched.
@@ -234,10 +234,10 @@ the same — `mountStatic()` scans `[data-app]` and mounts each with `live: null
 ```heex
 <!-- lib/my_app_web/controllers/page_html/dashboard.html.heex -->
 <div class="dashboard">
-  <.svelte name="kpi-cards" id="kpi-cards" props={%{team_id: @team_id}} />
-  <.svelte name="org-browser" id="org-browser" props={%{root_id: @team_id, depth: 3}} />
-  <.svelte name="graph-calendar" id="graph-calendar" props={%{days: 7}} />
-  <.svelte name="activity-feed" id="activity-feed" props={%{team_id: @team_id, page_size: 25}} />
+  <.app name="kpi-cards" id="kpi-cards" props={%{team_id: @team_id}} />
+  <.app name="org-browser" id="org-browser" props={%{root_id: @team_id, depth: 3}} />
+  <.app name="graph-calendar" id="graph-calendar" props={%{days: 7}} />
+  <.app name="activity-feed" id="activity-feed" props={%{team_id: @team_id, page_size: 25}} />
 </div>
 ```
 
@@ -284,4 +284,4 @@ The cost to know about: **each app bundle includes its own copy of the Svelte
 runtime (~71 kB).** Four apps on a page means four copies. For a handful of
 islands that's fine; if you ship many apps on one page, externalize `svelte` into
 a shared chunk (see the note in the project README / CHANGELOG). Everything else
-about the model scales linearly — add a folder, add a `<.svelte>` tag, done.
+about the model scales linearly — add a folder, add a `<.app>` tag, done.

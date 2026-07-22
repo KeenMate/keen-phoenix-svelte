@@ -87,7 +87,7 @@ defmodule ExampleWeb do
       # Core UI components
       import ExampleWeb.CoreComponents
 
-      # <.svelte name="..." /> component that mounts compiled Svelte apps
+      # <.app name="..." /> component that mounts compiled Svelte apps
       import KeenPhoenixSvelte
 
       # Common modules used in templates

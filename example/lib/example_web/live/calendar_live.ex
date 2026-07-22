@@ -19,7 +19,7 @@ defmodule ExampleWeb.CalendarLive do
       locale={@locale}
       flash={@flash}
     >
-      <.svelte name="calendar" id="calendar-app" props={%{}} />
+      <.app name="calendar" id="calendar-app" props={%{}} />
 
       <:aside>
         <Layouts.info_panel title="Calendar — a different service">

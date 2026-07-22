@@ -51,7 +51,14 @@ defmodule KeenPhoenixSvelte.Apps do
           # a multi-file bundle (JS + CSS + assets) — give a `base:` directory and
           # (optionally) the `entry:` the client imports (defaults to "main.mjs").
           # Any sub-path is proxied: `/apps/player/player.css` → `<base>/player.css`.
-          "player" => %{base: "https://cdn.acme.com/player@3/", entry: "player.mjs"}
+          "player" => %{base: "https://cdn.acme.com/player@3/", entry: "player.mjs"},
+          # a LOCAL directory on disk (e.g. a mounted volume another process writes
+          # to). `entry:` is a glob; the newest match wins, so a content-hashed
+          # bundle (`bundle.a1b2c3.js`) resolves without knowing the hash. Served
+          # same-origin through the proxy, cached/revalidated like any other source
+          # (the file's mtime is the validator, the `:ttl` the re-scan cadence).
+          # Local only — you can't glob a URL.
+          "dash" => %{dir: "/srv/apps/dash", entry: "bundle.*.js", ttl: :timer.seconds(30)}
         }
 
   The registry can just as well come from a database — build the same map at
@@ -118,12 +125,19 @@ defmodule KeenPhoenixSvelte.Apps do
 
   def resolve([first | rest] = segments) do
     apps = registered()
+    app = apps[first]
 
     cond do
-      match?(%{base: b} when is_binary(b), apps[first]) and safe_subpath?(rest) ->
-        spec = apps[first]
-        sub = if rest == [], do: entry_of(spec), else: Enum.join(rest, "/")
-        {first, join_url(spec.base, sub), sub}
+      # A local `:dir` app matches on its first segment (like a base-path app), but
+      # resolves against the filesystem: a bare hit globs `:entry` for the newest
+      # match, a sub-path names a literal file. Both become a `file*:`-scheme source
+      # that `ProxyCache` reads instead of fetching over HTTP.
+      match?(%{dir: d} when is_binary(d), app) and safe_subpath?(rest) ->
+        local_source(first, app, rest)
+
+      match?(%{base: b} when is_binary(b), app) and safe_subpath?(rest) ->
+        sub = if rest == [], do: entry_of(app), else: Enum.join(rest, "/")
+        {first, join_url(app.base, sub), sub}
 
       (full = Enum.join(segments, "/")) && match?(%{url: u} when is_binary(u), apps[full]) ->
         {full, apps[full].url, ""}
@@ -131,6 +145,17 @@ defmodule KeenPhoenixSvelte.Apps do
       true ->
         nil
     end
+  end
+
+  # A bare hit → glob the entry pattern (the plug/cache picks the newest match);
+  # a sub-path → a literal file under the dir (hashed sibling chunks, CSS, assets).
+  # The `file-glob:` / `file:` scheme tells `ProxyCache.fetch/2` to read from disk.
+  defp local_source(name, %{dir: dir} = spec, []),
+    do: {name, "file-glob:" <> Path.join(dir, entry_of(spec)), ""}
+
+  defp local_source(name, %{dir: dir}, rest) do
+    sub = Enum.join(rest, "/")
+    {name, "file:" <> Path.join(dir, sub), sub}
   end
 
   @doc """
@@ -161,6 +186,12 @@ defmodule KeenPhoenixSvelte.Apps do
 
   # The URL the browser imports for an app: the CDN URL in :direct mode, a
   # same-origin proxy path in :proxy mode (base apps point at their entry file).
+  #
+  # A local `:dir` app is always served through the proxy plug (you can't import a
+  # filesystem path in the browser) and its entry is a *glob*, so it emits a bare,
+  # stable `proxy_path/<name>` — the plug resolves the current file at request time.
+  defp client_url(name, %{dir: dir}) when is_binary(dir), do: proxy_path() <> "/" <> name
+
   defp client_url(_name, %{mode: :direct} = spec), do: direct_url(spec)
 
   defp client_url(name, %{base: base} = spec) when is_binary(base),
@@ -186,12 +217,13 @@ defmodule KeenPhoenixSvelte.Apps do
   end
 
   defp normalize(url) when is_binary(url),
-    do: %{url: url, base: nil, entry: nil, mode: load_mode(), ttl: nil, immutable: false}
+    do: %{url: url, base: nil, dir: nil, entry: nil, mode: load_mode(), ttl: nil, immutable: false}
 
   defp normalize(%{} = spec) do
     %{
       url: spec[:url] || spec["url"],
       base: spec[:base] || spec["base"],
+      dir: spec[:dir] || spec["dir"],
       entry: spec[:entry] || spec["entry"],
       mode: spec[:mode] || spec["mode"] || load_mode(),
       ttl: spec[:ttl] || spec["ttl"],

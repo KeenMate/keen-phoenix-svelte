@@ -7,7 +7,7 @@
   import { applyDiff, onlineUsers } from "./presence.js";
   import { translator } from "./i18n.js";
 
-  // props: rooms + initialRoom come from the server (<.svelte props=…>);
+  // props: rooms + initialRoom come from the server (<.app props=…>);
   // context carries the signed-in user; channel is the Phoenix channel factory;
   // live is the LiveView bridge (null on a plain page).
   let { rooms = [], initialRoom, context, channel, live, bus } = $props();

@@ -72,6 +72,68 @@ defmodule ExampleWeb.AppProxyTest do
     assert css |> get_resp_header("content-type") |> hd() =~ "text/css"
   end
 
+  test "a local :dir app serves the newest glob match same-origin as JS", %{conn: conn} do
+    dir = tmp_app_dir()
+    File.write!(Path.join(dir, "bundle.old.js"), "export const v = 'old';")
+    File.write!(Path.join(dir, "bundle.new.js"), "export const v = 'new';")
+    # Make `new` strictly newer so newest-mtime wins.
+    File.touch!(Path.join(dir, "bundle.old.js"), 1_700_000_000)
+    File.touch!(Path.join(dir, "bundle.new.js"), 1_700_000_100)
+
+    Application.put_env(:keen_phoenix_svelte, :apps, %{"dash" => %{dir: dir, entry: "bundle.*.js"}})
+
+    conn = get(conn, "/apps/dash")
+    assert response(conn, 200) == "export const v = 'new';"
+    assert conn |> get_resp_header("content-type") |> hd() =~ "text/javascript"
+    assert [_etag] = get_resp_header(conn, "etag")
+  end
+
+  test "a local :dir app serves sub-path assets typed by extension", %{conn: conn} do
+    dir = tmp_app_dir()
+    File.write!(Path.join(dir, "bundle.abc.js"), "//js")
+    File.write!(Path.join(dir, "style.css"), ".x{color:red}")
+    Application.put_env(:keen_phoenix_svelte, :apps, %{"dash" => %{dir: dir, entry: "bundle.*.js"}})
+
+    css = get(conn, "/apps/dash/style.css")
+    assert response(css, 200) == ".x{color:red}"
+    assert css |> get_resp_header("content-type") |> hd() =~ "text/css"
+  end
+
+  test "a local :dir app answers a browser If-None-Match with 304", %{conn: conn} do
+    dir = tmp_app_dir()
+    File.write!(Path.join(dir, "bundle.v1.js"), "//v1")
+    # ttl 0 → every request revalidates; an unchanged file 304s and keeps the ETag.
+    Application.put_env(:keen_phoenix_svelte, :apps, %{"dash" => %{dir: dir, entry: "bundle.*.js", ttl: 0}})
+
+    first = get(conn, "/apps/dash")
+    assert response(first, 200)
+    etag = first |> get_resp_header("etag") |> hd()
+
+    second = conn |> put_req_header("if-none-match", etag) |> get("/apps/dash")
+    assert response(second, 304) == ""
+  end
+
+  test "a local :dir app picks up a newer build on revalidation", %{conn: conn} do
+    dir = tmp_app_dir()
+    File.write!(Path.join(dir, "bundle.1.js"), "//one")
+    File.touch!(Path.join(dir, "bundle.1.js"), 1_700_000_000)
+    Application.put_env(:keen_phoenix_svelte, :apps, %{"dash" => %{dir: dir, entry: "bundle.*.js", ttl: 0}})
+
+    assert response(get(conn, "/apps/dash"), 200) == "//one"
+
+    # A new hashed build lands, strictly newer → newest-match flips to it.
+    File.write!(Path.join(dir, "bundle.2.js"), "//two")
+    File.touch!(Path.join(dir, "bundle.2.js"), 1_700_000_200)
+
+    assert response(get(conn, "/apps/dash"), 200) == "//two"
+  end
+
+  test "a local :dir app with no matching file is a 502", %{conn: conn} do
+    dir = tmp_app_dir()
+    Application.put_env(:keen_phoenix_svelte, :apps, %{"dash" => %{dir: dir, entry: "bundle.*.js"}})
+    assert response(get(conn, "/apps/dash"), 502)
+  end
+
   test "an unknown app is 404", %{conn: conn} do
     Application.put_env(:keen_phoenix_svelte, :apps, %{})
     conn = get(conn, "/apps/does-not-exist")
@@ -85,5 +147,13 @@ defmodule ExampleWeb.AppProxyTest do
 
     conn = get(conn, "/apps/broken")
     assert response(conn, 502)
+  end
+
+  # A throwaway dir per test — unique, so ProxyCache's ETS keys never bleed.
+  defp tmp_app_dir do
+    dir = Path.join(System.tmp_dir!(), "kps-app-#{System.unique_integer([:positive])}")
+    File.mkdir_p!(dir)
+    on_exit(fn -> File.rm_rf(dir) end)
+    dir
   end
 end

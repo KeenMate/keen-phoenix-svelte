@@ -10,7 +10,7 @@ plain controller-rendered pages — as self-contained islands.
 Write this in a template:
 
 ```heex
-<.svelte name="like" id={"like-#{@id}"} props={%{id: @id, liked: @liked}} />
+<.app name="like" id={"like-#{@id}"} props={%{id: @id, liked: @liked}} />
 ```
 
 …and the compiled Svelte app in `assets/apps/like/` is mounted into that element,
@@ -25,8 +25,7 @@ Svelte is the first-class, tooled path, but the mount boundary is
 `(target, opts) => { setProps, destroy }`. Because every island mounts through
 that one contract, there's a single component, `<.app>` (an optional
 `framework="…"` attribute just tags `data-framework` for debugging). The demo
-mounts Svelte, Lit, React and vanilla-JS islands through it. `<.svelte>` remains
-as a back-compat alias.
+mounts Svelte, Lit, React and vanilla-JS islands through it.
 
 > **New here, or comparing this to `live_svelte`?** Start with
 > **[Philosophy & comparison](docs/philosophy.md)** — the autonomous-island model,
@@ -42,7 +41,7 @@ as a back-compat alias.
 
 ## What's New in v1.0.0-rc.2
 
-- **Framework-neutral `<.app>` — one component mounts any island** — Every island mounts through the same `(target, opts) => { setProps, destroy }` contract, so there is now a single `app/1` component regardless of whether the bundle is Svelte, Lit, React, or hand-written vanilla JS. An optional `framework` attribute just emits an informational `data-framework` tag. `<.svelte>` remains as a back-compat alias for the rc.1 name.
+- **Framework-neutral `<.app>` — one component mounts any island** — Every island mounts through the same `(target, opts) => { setProps, destroy }` contract, so there is now a single `app/1` component regardless of whether the bundle is Svelte, Lit, React, or hand-written vanilla JS. An optional `framework` attribute just emits an informational `data-framework` tag.
 - **Placeholder / loader — no flash of empty container** — `<.app>` renders a placeholder that the client clears the instant the bundle mounts (after the fetch, so it stays visible the whole time). Resolution is a per-call `<:placeholder>` slot › the server-wide `config :keen_phoenix_svelte, :placeholder` › a built-in, dependency-free skeleton. The server default accepts an HTML string, a function, `{mod, fun}`, or `false` to disable.
 - **Event bus — island-to-island messaging without the server** — A `bus` joins the app boundary: a page-wide, client-side pub/sub (`emit`/`on`/`once`) over a DOM `EventTarget`, wired into both the LiveView hook and `mountStatic()`, so independent islands coordinate without a round-trip and without importing each other.
 - **External apps — a registry with `:direct`/`:proxy` delivery** — `KeenPhoenixSvelte.Apps` registers islands whose bundle lives elsewhere (a CDN, another deploy); `<.runtime>` emits a `name → url` manifest and `AppsManager.resolve/1` loads them. Pick `:direct` (browser imports the CDN URL) or `:proxy` (Phoenix fetches and re-serves same-origin via `KeenPhoenixSvelte.Apps.Proxy` — no CORS, CSP `'self'`).

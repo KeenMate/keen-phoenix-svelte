@@ -89,6 +89,33 @@ defmodule KeenPhoenixSvelte.AppsTest do
     assert Apps.resolve(["player", "ok.css"]) == {"player", "https://cdn/player/ok.css", "ok.css"}
   end
 
+  test "local :dir app: manifest is a stable same-origin path; resolve globs the entry" do
+    Application.put_env(:keen_phoenix_svelte, :load_mode, :proxy)
+
+    Application.put_env(:keen_phoenix_svelte, :apps, %{
+      "dash" => %{dir: "/srv/apps/dash", entry: "bundle.*.js"}
+    })
+
+    # The browser imports a bare, stable path — never the resolved (hashed) file.
+    assert Apps.manifest() == %{"dash" => "/apps/dash"}
+
+    # A bare hit becomes a glob source; a sub-path becomes a literal file source.
+    assert Apps.resolve(["dash"]) ==
+             {"dash", "file-glob:" <> Path.join("/srv/apps/dash", "bundle.*.js"), ""}
+
+    assert Apps.resolve(["dash", "chunk.abc.js"]) ==
+             {"dash", "file:" <> Path.join("/srv/apps/dash", "chunk.abc.js"), "chunk.abc.js"}
+  end
+
+  test "local :dir app defaults the entry glob to main.mjs and rejects traversal" do
+    Application.put_env(:keen_phoenix_svelte, :apps, %{"dash" => %{dir: "/srv/apps/dash"}})
+
+    assert Apps.resolve(["dash"]) ==
+             {"dash", "file-glob:" <> Path.join("/srv/apps/dash", "main.mjs"), ""}
+
+    assert Apps.resolve(["dash", "..", "secret"]) == nil
+  end
+
   test "proxy_opts merges per-app ttl/immutable over the global :proxy_cache config" do
     orig_cache = Application.get_env(:keen_phoenix_svelte, :proxy_cache)
     on_exit(fn -> restore(:proxy_cache, orig_cache) end)

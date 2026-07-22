@@ -8,8 +8,7 @@ defmodule KeenPhoenixSvelte do
   `(target, { props, context, live, api, channel, bus, el }) => { setProps, destroy }`
   works — Svelte, Lit, React, or hand-written vanilla JS. Because every island
   mounts through that one contract, there is a **single** component, `app/1` — the
-  framework makes no difference to how it's rendered or mounted. (`svelte/1` is a
-  thin back-compat alias.)
+  framework makes no difference to how it's rendered or mounted.
 
   This library ships two cooperating halves:
 
@@ -111,8 +110,8 @@ defmodule KeenPhoenixSvelte do
     doc: "Markup shown until the island mounts. Overrides the server-wide default."
 
   def app(assigns) do
-    # Normalize the slot so app/1 is safe to call directly (e.g. from svelte/1,
-    # which delegates here as a plain function and never sets the slot).
+    # Normalize the slot so app/1 is safe to call directly (as a plain function),
+    # where the placeholder slot may never be set.
     placeholder = Map.get(assigns, :placeholder, [])
     # A slot with actual inner content wins. A given-but-empty slot
     # (`<:placeholder />`) is an explicit opt-out: render nothing. No slot at all
@@ -174,21 +173,6 @@ defmodule KeenPhoenixSvelte do
   end
 
   @doc """
-  Back-compat alias for `app/1`, tagged as a Svelte app.
-
-  Kept because `<.svelte>` shipped in `1.0.0-rc.1`. New code should prefer
-  `app/1`; the two are identical apart from the `data-framework="svelte"` tag.
-  """
-  attr :name, :string, required: true
-  attr :id, :string, required: true
-  attr :props, :map, default: %{}
-  attr :class, :any, default: nil
-  attr :tag, :string, default: "div"
-  attr :rest, :global
-  slot :placeholder
-  def svelte(assigns), do: app(assign(assigns, :framework, "svelte"))
-
-  @doc """
   Emits the page-wide runtime context, read once by the client and injected into
   every mounted app as `context`.
 
@@ -203,7 +187,7 @@ defmodule KeenPhoenixSvelte do
 
   Keep this to *context*, not payload — user identity, a CSRF token for the `api`
   helper, an `api_base`, locale, and any tokens the app needs. Per-app data
-  belongs in each `<.svelte props={...} />`.
+  belongs in each `<.app props={...} />`.
 
   The context is JSON-encoded with HTML-safe escaping so it is safe to embed in
   the `<script type="application/json">` tag.

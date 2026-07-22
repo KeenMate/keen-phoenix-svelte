@@ -14,7 +14,7 @@ differs from [`live_svelte`](https://github.com/woutdp/live_svelte).
 An island is a self-contained Svelte app (a dashboard, an org-structure browser, a
 map, a data grid) mounted into one element on the page. Its lifecycle is:
 
-1. **Initialize with config.** The server renders `<.svelte name id props>`; the
+1. **Initialize with config.** The server renders `<.app name id props>`; the
    `props` are small per-component **configuration** — an org id, a feature flag,
    an initial toggle — *not* a payload. Big data is fetched by the island, not
    serialized into the DOM.

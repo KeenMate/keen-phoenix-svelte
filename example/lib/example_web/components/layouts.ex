@@ -157,8 +157,10 @@ defmodule ExampleWeb.Layouts do
     </div>
 
     <%!-- Page-wide toast feed. Its own island; it coordinates with the other
-    islands purely through the event bus (no props, no server). --%>
-    <.svelte name="activity" id="activity-app" props={%{}} />
+    islands purely through the event bus (no props, no server). Fully-qualified
+    because THIS module defines its own `app/1` (the layout), so a bare `<.app>`
+    here would be ambiguous — see the note in installation.md. --%>
+    <KeenPhoenixSvelte.app name="activity" id="activity-app" props={%{}} />
 
     <.flash_group flash={@flash} />
     """

@@ -34,7 +34,7 @@ defmodule ExampleWeb.ChatLive do
       flash={@flash}
     >
       <div class="h-[calc(100vh-8rem)]">
-        <.svelte name="chat" id="chat-app" props={%{rooms: @rooms, initialRoom: "general"}} />
+        <.app name="chat" id="chat-app" props={%{rooms: @rooms, initialRoom: "general"}} />
       </div>
 
       <:aside>

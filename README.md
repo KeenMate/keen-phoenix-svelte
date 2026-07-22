@@ -11,7 +11,7 @@ context and a standardized way to talk to the server.
 You write:
 
 ```heex
-<.svelte name="org-browser" id="org-42" props={%{org_id: 42}} />
+<.app name="org-browser" id="org-42" props={%{org_id: 42}} />
 ```
 
 …and the compiled Svelte app in `assets/apps/org-browser/` is mounted into that

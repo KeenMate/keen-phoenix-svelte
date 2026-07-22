@@ -31,7 +31,7 @@ defmodule ExampleWeb.VideosLive do
       locale={@locale}
       flash={@flash}
     >
-      <.svelte name="video-catalogue" id="videos-app" props={%{}} />
+      <.app name="video-catalogue" id="videos-app" props={%{}} />
 
       <:aside>
         <Layouts.info_panel title="Videos — REST + the live bridge">

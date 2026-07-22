@@ -5,7 +5,7 @@ defmodule ExampleWeb.PageControllerTest do
     html = conn |> get(~p"/calendar-plain") |> html_response(200)
 
     assert html =~ "plain controller-rendered page"
-    # the <.svelte> mount point + the once-per-page runtime context (with a token)
+    # the <.app> mount point + the once-per-page runtime context (with a token)
     assert html =~ ~s(data-app="calendar")
     assert html =~ ~s(id="keen-context")
   end

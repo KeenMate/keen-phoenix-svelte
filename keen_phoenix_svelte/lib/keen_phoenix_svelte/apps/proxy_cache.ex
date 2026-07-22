@@ -159,17 +159,23 @@ defmodule KeenPhoenixSvelte.Apps.ProxyCache do
   # ── orphan sweep ──────────────────────────────────────────────────────────
 
   # Drop cached URLs that are no longer registered — deleting the current key
-  # during a `:set` traversal is safe.
+  # during a `:set` traversal is safe. Local `file*:` sources are left alone: their
+  # per-asset keys are dynamic (can't appear in the registered set) and re-reading
+  # from disk is cheap, so there's nothing to reclaim by evicting them.
   defp sweep(keep) do
     :ets.foldl(
       fn {url, _entry}, _acc ->
-        unless MapSet.member?(keep, url), do: :ets.delete(@table, url)
+        if evictable?(url, keep), do: :ets.delete(@table, url)
         nil
       end,
       nil,
       @table
     )
   end
+
+  defp evictable?("file-glob:" <> _, _keep), do: false
+  defp evictable?("file:" <> _, _keep), do: false
+  defp evictable?(url, keep), do: not MapSet.member?(keep, url)
 
   defp registered_urls do
     Apps.registered() |> Map.values() |> MapSet.new(& &1.url)
@@ -285,6 +291,14 @@ defmodule KeenPhoenixSvelte.Apps.ProxyCache do
 
   # ── upstream fetch (conditional GET) ──────────────────────────────────────
 
+  # A local `:dir` app resolves to a `file*:`-scheme "url" (see `Apps.resolve/1`)
+  # and reads from disk instead of fetching over HTTP — but the rest of the cache
+  # (single-flight, ETS, freshness window, conditional revalidation, browser
+  # ETag/304) is identical. The file's signature (name + mtime + size) plays the
+  # role of the upstream ETag: unchanged → `:not_modified` keeps the cached bytes.
+  defp fetch("file-glob:" <> pattern, validators), do: local_glob_fetch(pattern, validators)
+  defp fetch("file:" <> path, validators), do: local_file_fetch(path, validators)
+
   # Injectable via `:app_provider`:
   #   * 2-arity `fn url, validators -> {:ok, resp} | :not_modified | {:error, r} end`
   #   * 1-arity `fn url -> {:ok, body} | {:error, r} end`  (legacy; always a 200)
@@ -296,6 +310,68 @@ defmodule KeenPhoenixSvelte.Apps.ProxyCache do
       _ -> httpc_fetch(url, validators)
     end
   end
+
+  # ── local filesystem source (glob newest-match / literal file) ────────────
+
+  # Glob the pattern and take the newest by mtime — so a hashed bundle
+  # (`bundle.a1b2c3.js`) resolves to the latest build without knowing the hash.
+  defp local_glob_fetch(pattern, validators) do
+    case newest_match(pattern) do
+      nil -> {:error, {:no_match, pattern}}
+      {path, sig} -> serve_local(path, sig, validators)
+    end
+  end
+
+  defp local_file_fetch(path, validators) do
+    case file_sig(path) do
+      nil -> {:error, {:enoent, path}}
+      stat -> serve_local(path, sig_string(path, stat), validators)
+    end
+  end
+
+  # Unchanged signature → the browser/cache copy is current (the mtime "304").
+  defp serve_local(path, sig, validators) do
+    if validators[:last_modified] == sig do
+      :not_modified
+    else
+      case File.read(path) do
+        # etag: nil → the cache mints a weak content ETag (as for an ETag-less
+        # origin); `sig` rides in `last_modified` as the opaque revalidator.
+        {:ok, body} -> {:ok, %{body: body, etag: nil, last_modified: sig, cache_control: nil}}
+        {:error, reason} -> {:error, reason}
+      end
+    end
+  end
+
+  defp newest_match(pattern) do
+    pattern
+    # `Path.wildcard/1` reads `\` as an escape, so a Windows dir (`C:\...`) never
+    # matches — normalize separators to `/` first (File.stat/read accept either).
+    |> String.replace("\\", "/")
+    |> Path.wildcard()
+    |> Enum.map(fn p -> {p, file_sig(p)} end)
+    |> Enum.reject(fn {_p, sig} -> is_nil(sig) end)
+    |> case do
+      [] ->
+        nil
+
+      entries ->
+        {path, {_m, _s} = stat} = Enum.max_by(entries, fn {_p, {mtime, _size}} -> mtime end)
+        {path, sig_string(path, stat)}
+    end
+  end
+
+  defp file_sig(path) do
+    case File.stat(path, time: :posix) do
+      {:ok, %{type: :regular, mtime: mtime, size: size}} -> {mtime, size}
+      _ -> nil
+    end
+  end
+
+  # Include the basename so a hash-renamed file (same mtime/size) still counts as
+  # changed; mtime + size catch an in-place rewrite.
+  defp sig_string(path, {mtime, size}),
+    do: Path.basename(path) <> ":" <> Integer.to_string(mtime) <> ":" <> Integer.to_string(size)
 
   defp wrap_legacy({:ok, body}),
     do: {:ok, %{body: body, etag: nil, last_modified: nil, cache_control: nil}}

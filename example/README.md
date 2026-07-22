@@ -48,7 +48,7 @@ During development the Phoenix watcher rebuilds the Svelte apps on change
   the channel `socket_token`, and the simulated `tokens.graph`.
 - **Shell** — `Layouts.workspace/1` is the sidebar + top-bar chrome shared by every
   LiveView and the plain page.
-- **Islands** — `<.svelte name="…" props={…}>` in each thin LiveView
+- **Islands** — `<.app name="…" props={…}>` in each thin LiveView
   (`lib/example_web/live/`). The Svelte source lives in `assets/apps/<name>/js/`.
 - **Backend** — in-memory contexts (`Example.Directory`, `Example.Chat`,
   `Example.VideoCatalogue`, `Example.Calendar`), the `ChatChannel`, the REST

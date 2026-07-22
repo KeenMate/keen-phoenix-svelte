@@ -4,6 +4,9 @@
 # Built Svelte app bundles in the example (produced by the asset build)
 /example/priv/static/apps/
 
+# Vite's transient ESM-config temp files (left behind by interrupted builds)
+*.vite.config.*.timestamp-*.mjs
+
 # OS / editor cruft
 .DS_Store
 Thumbs.db

@@ -18,16 +18,65 @@ defmodule ExampleWeb.ProxyingLive do
 
   @cdn "https://apps.keen-phoenix-svelte.keenmate.dev"
 
+  # Shown verbatim on the page. Kept as a string because literal `%{...}` can't
+  # sit inline in a HEEx `<pre>` — the `{}` would be parsed as interpolation.
+  @config_snippet """
+  config :keen_phoenix_svelte,
+    apps: %{
+      # one self-contained file → a single URL fully describes it
+      "hello" => %{url: "…/hello/main.mjs", mode: :direct},
+
+      # a directory of files → point at the base; siblings proxy under it too
+      "metrics" => %{
+        base: "…/metrics/",
+        entry: "main.mjs",
+        mode: :proxy,
+        ttl: :timer.seconds(60)
+      }
+    }
+  """
+
+  @hello_tree """
+  hello/
+  └─ main.mjs   ← markup + behaviour + styles\
+  """
+
+  @metrics_tree """
+  metrics/
+  ├─ main.mjs      ← entry
+  ├─ metrics.css   ← <link>ed stylesheet
+  └─ metrics.json  ← fetched at mount\
+  """
+
   def mount(_params, _session, socket) do
     # Only render each card if its app is actually registered, so a deployment
     # that omits one from config degrades cleanly instead of 502-ing.
     manifest = KeenPhoenixSvelte.Apps.manifest()
 
+    hello? = Map.has_key?(manifest, "hello")
+    metrics? = Map.has_key?(manifest, "metrics")
+
+    # Config for the client-side load-stats hook: which islands to time, the
+    # container to watch for first render, and a URL substring to match each
+    # bundle's Performance Resource Timing entry.
+    watch =
+      [
+        hello? &&
+          %{name: "hello", container: "hello-app", match: "/hello/main.mjs", label: ":direct"},
+        metrics? &&
+          %{name: "metrics", container: "metrics-app", match: "/apps/metrics/main.mjs", label: ":proxy"}
+      ]
+      |> Enum.filter(& &1)
+
     {:ok,
      assign(socket,
        cdn: @cdn,
-       hello?: Map.has_key?(manifest, "hello"),
-       metrics?: Map.has_key?(manifest, "metrics"),
+       config_snippet: @config_snippet,
+       hello_tree: @hello_tree,
+       metrics_tree: @metrics_tree,
+       hello?: hello?,
+       metrics?: metrics?,
+       watch: watch,
        page_title: "Proxying"
      )}
   end
@@ -117,6 +166,111 @@ defmodule ExampleWeb.ProxyingLive do
                 </p>
               <% end %>
             </div>
+          </div>
+        </section>
+
+        <%!-- Live, in-browser load timings for the two islands --%>
+        <section :if={@watch != []} class="card bg-base-100 border border-base-300 rounded-xl p-6">
+          <div class="flex items-center gap-2">
+            <.icon name="hero-clock" class="size-6 text-primary" />
+            <h2 class="text-lg font-semibold">Live load statistics</h2>
+          </div>
+          <p class="mt-2 text-base-content/70">
+            Measured right here in your browser — the <strong>Performance API</strong>
+            for when each bundle was requested and finished loading, and a
+            <strong>MutationObserver</strong>
+            for when the island replaced its placeholder with real DOM. No server
+            round-trip, no library hooks. Times are milliseconds since the page
+            started loading, so the three stages share one clock. Reload to watch them again.
+          </p>
+          <div
+            id="proxy-load-stats"
+            phx-hook="ProxyLoadStats"
+            phx-update="ignore"
+            data-apps={Jason.encode!(@watch)}
+            class="mt-4 grid gap-4 sm:grid-cols-2"
+          >
+          </div>
+        </section>
+
+        <%!-- How each app is actually built --%>
+        <section>
+          <div class="flex items-center gap-2">
+            <.icon name="hero-cube" class="size-6 text-primary" />
+            <h2 class="text-lg font-semibold">How the two apps are built</h2>
+          </div>
+          <p class="mt-2 text-base-content/70">
+            Neither app is built by this library — they're hand-written
+            <strong>vanilla-JS ES modules</strong>
+            in the sibling <code>keen-phoenix-svelte-apps</code>
+            repo. Both default-export the same mount contract
+            <code>(target, {"{ props, context, live, api, channel, bus, el }"}) → {"{ setProps, destroy }"}</code>.
+            What actually differs is <strong>how many files each ships</strong>
+            — and that one fact dictates how you register it.
+          </p>
+
+          <div class="grid gap-6 md:grid-cols-2 mt-4">
+            <%!-- hello: one file --%>
+            <div class="card bg-base-100 border border-base-300 rounded-xl p-5">
+              <div class="flex items-center gap-2">
+                <code class="text-sm font-mono font-semibold">hello</code>
+                <span class="badge badge-sm badge-ghost">one file · vanilla JS</span>
+              </div>
+              <pre class="mt-3 bg-base-300/50 rounded-lg p-2.5 text-[0.7rem] leading-relaxed"><code>{@hello_tree}</code></pre>
+              <ul class="mt-3 text-sm text-base-content/70 space-y-2">
+                <li>
+                  <strong>Styles ship inside the JS.</strong>
+                  On mount it injects a scoped <code>&lt;style id="keen-hello-style"&gt;</code>
+                  once — the "CSS-injected-by-JS" pattern. No stylesheet to fetch.
+                </li>
+                <li>
+                  <strong>No companion files</strong>
+                  means a single URL fully describes it, so it's registered with a bare
+                  <code>url:</code>. Nothing to resolve relative to the module.
+                </li>
+                <li>
+                  That's why <code>:direct</code>
+                  is trivial here — one cross-origin <code>import()</code> and it's done.
+                </li>
+              </ul>
+            </div>
+
+            <%!-- metrics: three files --%>
+            <div class="card bg-base-100 border border-base-300 rounded-xl p-5">
+              <div class="flex items-center gap-2">
+                <code class="text-sm font-mono font-semibold">metrics</code>
+                <span class="badge badge-sm badge-ghost">three files · sibling assets</span>
+              </div>
+              <pre class="mt-3 bg-base-300/50 rounded-lg p-2.5 text-[0.7rem] leading-relaxed"><code>{@metrics_tree}</code></pre>
+              <ul class="mt-3 text-sm text-base-content/70 space-y-2">
+                <li>
+                  The entry resolves its companions <strong>relative to itself</strong>
+                  — <code>new URL("./metrics.css", import.meta.url)</code>
+                  and the same for the JSON.
+                </li>
+                <li>
+                  Because those URLs are <strong>origin-relative</strong>, the
+                  <em>exact same bundle</em>
+                  works unmodified in both modes: <code>import.meta.url</code>
+                  is the CDN under <code>:direct</code>, and your same-origin
+                  <code>/apps/metrics/main.mjs</code> under <code>:proxy</code>.
+                </li>
+                <li>
+                  It's registered with <code>base:</code>
+                  (the directory) + <code>entry:</code>, so all three files proxy
+                  under one prefix — no per-file registration.
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          <%!-- the registration that ties it together --%>
+          <div class="mt-4">
+            <p class="text-sm text-base-content/70">
+              Both are wired up in one config block — the single-file app gets a
+              <code>url:</code>, the multi-file app a <code>base:</code>:
+            </p>
+            <pre class="mt-2 bg-base-300/50 rounded-lg p-3 overflow-x-auto text-[0.72rem] leading-relaxed"><code>{@config_snippet}</code></pre>
           </div>
         </section>
 

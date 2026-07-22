@@ -37,7 +37,7 @@ defmodule ExampleWeb.HomeLive do
 
   # The one object every island's entry receives — the only coupling to Phoenix.
   @boundary [
-    %{name: "props", desc: "Small per-island config, rendered by <.svelte props={…}>."},
+    %{name: "props", desc: "Small per-island config, rendered by <.app props={…}>."},
     %{
       name: "context",
       desc: "Page-wide user, CSRF, tokens, api_base and socket — emitted once per page."
@@ -287,7 +287,7 @@ defmodule ExampleWeb.HomeLive do
           </ul>
 
           <div class="mt-4">
-            <.svelte name="greeter" id="greeter-app" props={%{via: "the app registry (proxy mode)"}} />
+            <.app name="greeter" id="greeter-app" props={%{via: "the app registry (proxy mode)"}} />
           </div>
         </section>
 

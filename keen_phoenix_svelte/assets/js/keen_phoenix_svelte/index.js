@@ -28,7 +28,7 @@ export function mountStatic(root) {
  * LiveView hook that mounts a compiled Svelte component into its element and
  * keeps it in sync with server-driven prop changes.
  *
- * Rendered by the `<.svelte>` function component; you only need to register it:
+ * Rendered by the `<.app>` function component; you only need to register it:
  *
  *   import { getHooks } from "@keenmate/phoenix_svelte"
  *   new LiveSocket("/live", Socket, { hooks: getHooks(), ... })

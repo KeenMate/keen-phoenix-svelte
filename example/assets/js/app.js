@@ -24,13 +24,14 @@ import {Socket} from "phoenix"
 import {LiveSocket} from "phoenix_live_view"
 import {hooks as colocatedHooks} from "phoenix-colocated/example"
 import {getHooks, mountStatic} from "@keenmate/phoenix_svelte"
+import {ProxyLoadStats} from "./proxy_load_stats.js"
 import topbar from "../vendor/topbar"
 
 const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 const liveSocket = new LiveSocket("/live", Socket, {
   longPollFallbackMs: 2500,
   params: {_csrf_token: csrfToken},
-  hooks: {...colocatedHooks, ...getHooks()},
+  hooks: {...colocatedHooks, ...getHooks({ProxyLoadStats})},
 })
 
 // Show progress bar on live navigation and form submits

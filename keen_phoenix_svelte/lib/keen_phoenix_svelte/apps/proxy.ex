@@ -110,9 +110,16 @@ defmodule KeenPhoenixSvelte.Apps.Proxy do
 
   # JS is forced to a module-friendly type regardless of what a (possibly
   # mislabeling) origin reports; CSS and other assets in a base-path bundle keep
-  # their own type, derived from the sub-path extension.
-  defp content_type(url) do
-    case url |> URI.parse() |> Map.get(:path) |> to_string() |> Path.extname() |> String.downcase() do
+  # their own type, derived from the sub-path extension. Local `file*:` sources are
+  # typed by the path/glob extension the same way.
+  defp content_type("file-glob:" <> pattern), do: ext_type(pattern)
+  defp content_type("file:" <> path), do: ext_type(path)
+
+  defp content_type(url),
+    do: url |> URI.parse() |> Map.get(:path) |> to_string() |> ext_type()
+
+  defp ext_type(path) do
+    case path |> Path.extname() |> String.downcase() do
       ext when ext in [".mjs", ".js"] -> "text/javascript"
       ".css" -> "text/css"
       "" -> "text/javascript"

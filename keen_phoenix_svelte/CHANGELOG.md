@@ -26,12 +26,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   while JS is still forced to a module-friendly type regardless of what the origin
   reports.
 
+**Local `dir:` source — proxy a content-hashed bundle from a directory on disk**
+- A registered app can now name a **local directory** with `dir:` (a mounted
+  volume another process rebuilds) instead of a remote `url:`/`base:`. The `entry:`
+  is treated as a **glob** (default `main.mjs`); the **newest match wins**, so a
+  content-hashed entry (`bundle.a1b2c3.js`) resolves without knowing the hash. The
+  client imports a stable `/apps/<name>`; sibling/hashed chunks are served as
+  literal files under the same prefix.
+- Implemented by **reusing the existing `ProxyCache`** rather than a new mechanism:
+  a `file*:`-scheme source reads from disk, with the file's signature
+  (name + mtime + size) acting as the validator — an unchanged file is the `304`
+  (cached bytes kept), a newer file swaps them in and mints a fresh weak `ETag`.
+  The `:ttl` is the folder re-scan cadence (fresh reads are pure ETS, no I/O);
+  `immutable: true` pins it. Local `file*:` cache entries are exempt from the
+  orphan sweep. Local only — you can't glob a URL.
+
 **Docs**
 - New guide **"Island-able vs page-owning apps"** (`docs/packaging-apps.md`): the
   one question that decides whether a bundle can be mounted inline at all — built
   to mount into a target vs. built to be the whole page — with the island-able
   checklist, the page-owning anti-pattern, and the iframe fallback for apps you
   can't repackage. Cross-linked from the authoring and external-apps guides.
+- **Authoring apps** guide (`docs/authoring-apps.md`) expanded from a Svelte-only
+  walkthrough to cover **any framework** — the Vite library-mode config that emits
+  one self-contained `main.mjs` (single `.mjs`, runtime bundled in, CSS inlined),
+  per-framework `main.js` adapter recipes for **React, Lit, Vue, and plain JS**
+  mapping each lifecycle onto `{ setProps, destroy }`, the three single-file CSS
+  strategies, optional runtime-sharing, and an authoring checklist.
+
+### Removed
+
+- **The `<.svelte>` component alias is gone** — there is now one island component,
+  `<.app>`. `svelte/1` was a thin back-compat alias for the rc.1 name; keeping two
+  names for the same framework-neutral component only invited confusion (and reads
+  wrong in a React/Lit/Vue example). Replace `<.svelte …>` with `<.app …>` — the
+  attributes are identical (pass `framework="svelte"` if you want the informational
+  `data-framework` tag). All docs and the demo now use `<.app>`.
 
 ## [1.0.0-rc.3] - 2026-07-21 [PUBLISHED]
 

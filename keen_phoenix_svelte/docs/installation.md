@@ -11,12 +11,19 @@ Add the dependency (`mix.exs`):
 ```
 
 Import the components wherever you render HTML — typically `html_helpers/0` in
-your `*_web.ex`, so `<.svelte>` and `<KeenPhoenixSvelte.runtime>` are available
+your `*_web.ex`, so `<.app>` and `<KeenPhoenixSvelte.runtime>` are available
 everywhere:
 
 ```elixir
 import KeenPhoenixSvelte
 ```
+
+> **Note — the `app/1` name collides with your `Layouts.app/1`.** Phoenix's
+> generated `Layouts` module defines its own `app/1` (the app-shell layout), so a
+> bare `<.app …>` *inside that one module* is ambiguous with the imported island
+> component. Everywhere else (LiveViews, controllers, other components) `<.app>`
+> works unqualified; in `Layouts` — the rare case you mount an island in the layout
+> itself — call it fully-qualified as `<KeenPhoenixSvelte.app …>`.
 
 Serve the built app bundles by adding `apps` to your static paths (`*_web.ex`):
 
@@ -95,4 +102,4 @@ To give apps a user context, a REST helper, and/or channels, render the context
 once in your root layout — see [Server communication](server-communication.md).
 
 That's it. Add an app under `assets/apps/` (see [Authoring apps](authoring-apps.md))
-and drop a `<.svelte name="..." id="..." />` into any template.
+and drop a `<.app name="..." id="..." />` into any template.

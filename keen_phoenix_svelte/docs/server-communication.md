@@ -21,7 +21,7 @@ Deliver page-wide context once (root layout), on both LiveView and plain pages:
 It is read once by the client and injected into every app as `context`. Keep it
 to *context, not payload* — user identity, a CSRF token for `api`, an `api_base`,
 a `socket_token` for channels, locale, and any tokens the app needs. Per-app data
-belongs in each `<.svelte props={...} />`.
+belongs in each `<.app props={...} />`.
 
 ## The app boundary
 
@@ -29,7 +29,7 @@ The mount fn receives one options object:
 
 | Key | What it is |
 | --- | --- |
-| `props` | per-component config from `<.svelte props={...} />` |
+| `props` | per-component config from `<.app props={...} />` |
 | `context` | the page-wide runtime context above |
 | `live` | LiveView bridge, or **`null`** on plain (non-LiveView) pages |
 | `api` | REST helper to your Phoenix backend (CSRF + session) |

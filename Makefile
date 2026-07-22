@@ -15,7 +15,7 @@ HEX_VERSION := $(shell grep -E '^\s*@version\s+"' $(LIB)/mix.exs | head -1 | sed
 NPM_VERSION := $(shell grep -E '"version"\s*:' $(LIB)/package.json | head -1 | sed -E 's/.*"version"\s*:\s*"([^"]+)".*/\1/')
 
 .DEFAULT_GOAL := help
-.PHONY: help setup dev server sync-lib build-assets test clean \
+.PHONY: help setup dev server sync-lib build-assets test clean docs \
         hex-deps hex-compile hex-build-docs hex-docs hex-build hex-build-inspect \
         hex-publish-dry hex-publish-rc hex-publish \
         npm-pack npm-publish-rc npm-publish \
@@ -34,6 +34,7 @@ help:
 	@echo "  clean             Remove build artifacts, deps and node_modules"
 	@echo ""
 	@echo "Library — docs & inspection ($(LIB)/):"
+	@echo "  docs              Build the hexdocs and serve them at http://localhost:$(DOCS_PORT)"
 	@echo "  hex-docs          Generate hexdocs into $(LIB)/doc via ex_doc"
 	@echo "  hex-build-docs    mix compile --warnings-as-errors + mix docs (publish-time build)"
 	@echo "  hex-build-inspect Build the Hex tarball and print its file list"
@@ -98,6 +99,16 @@ hex-deps: ## Fetch the library's Hex deps
 
 hex-compile: ## Compile the library with --warnings-as-errors
 	cd $(LIB) && mix compile --warnings-as-errors
+
+# Port the local docs server binds to (override: `make docs DOCS_PORT=9000`).
+DOCS_PORT ?= 8888
+
+docs: hex-docs ## Build the hexdocs and serve them locally at http://localhost:$(DOCS_PORT)
+	@echo "Serving $(LIB)/doc at http://localhost:$(DOCS_PORT)/ (Ctrl+C to stop) ..."
+	@# Open the browser once (non-blocking); harmless if it can't.
+	@python3 -m webbrowser "http://localhost:$(DOCS_PORT)/" >/dev/null 2>&1 || true
+	@# Serve over HTTP (not file://) so the docs' search index loads correctly.
+	@cd $(LIB)/doc && python3 -m http.server $(DOCS_PORT)
 
 hex-docs: ## Generate hexdocs into $(LIB)/doc via ex_doc
 	cd $(LIB) && mix docs

@@ -20,7 +20,7 @@ opposite of `live_svelte`. Keep it that way.
 
 ```
 keen_phoenix_svelte/   # the library (publishable)
-  lib/keen_phoenix_svelte.ex        # <.svelte> + <.runtime> function components
+  lib/keen_phoenix_svelte.ex        # <.app> + <.runtime> function components
   assets/js/keen_phoenix_svelte/    # KeenSvelte hook, AppsManager, runtime, channel
   assets/vite/config.js             # shared Vite config helper (appConfig)
 example/               # Phoenix 1.8 LiveView demo app depending on it via path:/file:
@@ -45,7 +45,7 @@ as a watcher (see `example/config/dev.exs`).
 
 Two cooperating halves:
 
-- **Elixir** — `<.svelte name id props>` renders a `<div>` with `phx-hook`,
+- **Elixir** — `<.app name id props>` renders a `<div>` with `phx-hook`,
   `phx-update="ignore"`, `data-app`, JSON `data-props`. `<KeenPhoenixSvelte.runtime
   context={...}>` emits the once-per-page context.
 - **JS** — the `KeenSvelte` hook mounts the app inside a LiveView; `AppsManager`
