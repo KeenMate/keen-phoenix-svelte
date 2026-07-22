@@ -5,6 +5,34 @@ All notable changes to `keen_phoenix_svelte` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0-rc.4] - 2026-07-22
+
+### Added
+
+**Base-path proxy — proxy a whole multi-file bundle (JS + CSS + assets), not just one file**
+- A registered app can now name an upstream **directory** with `base:` (and an
+  optional `entry:`, default `main.mjs`) instead of a single `url:`. Any sub-path
+  is forwarded: `/apps/<name>/<sub-path>` proxies to `<base>/<sub-path>`, so a
+  vendor bundle whose JS entry pulls a separate stylesheet, fonts, or images all
+  re-serve same-origin from one registration. The client imports the entry
+  (`/apps/<name>/<entry>` in `:proxy` mode, `<base>/<entry>` in `:direct`).
+- `KeenPhoenixSvelte.Apps.resolve/1` resolves a proxy request path to
+  `{name, upstream_url, sub_path}` — matching a base-path app on its first segment
+  (rest forwarded) or a single-file app by full name. Path traversal (`..`) and
+  empty/`.`/backslash segments are rejected before any upstream fetch.
+- `KeenPhoenixSvelte.Apps.Proxy` now types each proxied file by its extension
+  (`.mjs`/`.js` → `text/javascript`, `.css` → `text/css`, else `MIME`), so a
+  base-path bundle's stylesheet and assets are served with correct `Content-Type`
+  while JS is still forced to a module-friendly type regardless of what the origin
+  reports.
+
+**Docs**
+- New guide **"Island-able vs page-owning apps"** (`docs/packaging-apps.md`): the
+  one question that decides whether a bundle can be mounted inline at all — built
+  to mount into a target vs. built to be the whole page — with the island-able
+  checklist, the page-owning anti-pattern, and the iframe fallback for apps you
+  can't repackage. Cross-linked from the authoring and external-apps guides.
+
 ## [1.0.0-rc.3] - 2026-07-21 [PUBLISHED]
 
 ### Added
@@ -216,6 +244,7 @@ islands, on both LiveView and plain controller-rendered pages.
 - External-service token delivery (a server-minted token for a *different*
   service in `context.tokens.*`) — planned, not yet implemented.
 
+[1.0.0-rc.4]: https://github.com/KeenMate/keen-phoenix-svelte/releases/tag/v1.0.0-rc.4
 [1.0.0-rc.3]: https://github.com/KeenMate/keen-phoenix-svelte/releases/tag/v1.0.0-rc.3
 [1.0.0-rc.2]: https://github.com/KeenMate/keen-phoenix-svelte/releases/tag/v1.0.0-rc.2
 [1.0.0-rc.1]: https://github.com/KeenMate/keen-phoenix-svelte/releases/tag/v1.0.0-rc.1

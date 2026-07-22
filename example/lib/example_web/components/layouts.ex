@@ -134,6 +134,12 @@ defmodule ExampleWeb.Layouts do
                   label={I18n.t(@locale, "nav.calendar")}
                 />
                 <.nav_item
+                  navigate={~p"/proxying"}
+                  active={@active == :proxying}
+                  icon="hero-globe-alt"
+                  label={I18n.t(@locale, "nav.proxying")}
+                />
+                <.nav_item
                   navigate={~p"/docs"}
                   active={@active == :docs}
                   icon="hero-book-open"
@@ -181,7 +187,7 @@ defmodule ExampleWeb.Layouts do
   # The header title: prefer the localized nav label for the four main areas,
   # otherwise fall back to the page-supplied title (e.g. the plain calendar page).
   defp header_title(locale, active, _title)
-       when active in [:home, :chat, :videos, :calendar, :docs],
+       when active in [:home, :chat, :videos, :calendar, :proxying, :docs],
        do: I18n.t(locale, "nav.#{active}")
 
   defp header_title(_locale, _active, title), do: title || ""

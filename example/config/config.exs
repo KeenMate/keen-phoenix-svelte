@@ -57,13 +57,35 @@ config :phoenix, :json_library, Jason
 # KeenPhoenixSvelte.Apps.
 config :keen_phoenix_svelte,
   apps: %{
-    "greeter" => "/external/greeter/main.mjs"
+    "greeter" => "/external/greeter/main.mjs",
+    # Two islands hosted on a GENUINELY external CDN
+    # (apps.keen-phoenix-svelte.keenmate.dev — see the sibling
+    # keen-phoenix-svelte-apps repo), showcased side by side on the /proxying
+    # page. `hello` loads :direct — the browser imports the CDN URL itself.
+    # `metrics` loads :proxy — Phoenix fetches the CDN bundle *and* its sibling
+    # stylesheet + data file and re-serves them same-origin under /apps/metrics/*.
+    "hello" => %{
+      url: "https://apps.keen-phoenix-svelte.keenmate.dev/hello/main.mjs",
+      mode: :direct
+    },
+    "metrics" => %{
+      base: "https://apps.keen-phoenix-svelte.keenmate.dev/metrics/",
+      entry: "main.mjs",
+      mode: :proxy,
+      ttl: :timer.seconds(60)
+    }
   },
   # Server-wide island loader. The placeholder is server-rendered into the page
   # (so it can use the app's own daisyUI/Tailwind) and the client clears it the
   # instant the bundle mounts — no flash of empty container. Any island can
   # override this with a <:placeholder> slot.
   placeholder: ~s|<div class="skeleton h-full min-h-[3rem] w-full rounded-lg"></div>|
+
+# We don't use LiveView's colocated hooks / JS (islands are separate compiled
+# bundles, wired via getHooks()), so silence the Windows-only "Failed to symlink
+# node_modules for ColocatedJS: :eperm" compile warning — the symlink is for a
+# feature we never touch.
+config :phoenix_live_view, :colocated_js, disable_symlink_warning: true
 
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.

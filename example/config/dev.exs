@@ -5,10 +5,25 @@ import Config
 # upstream (here, our own /external file — stand-in for a CDN). This is the
 # CSP/CORS-friendly corporate mode. Flip load_mode to :direct to have the browser
 # fetch the upstream URL itself.
+#
+# `hello` and `metrics` come from the real external CDN (see config.exs) and keep
+# their explicit :direct / :proxy modes here too, so the /proxying page shows both
+# modes against a genuine cross-origin host in dev. (No local :5555 origin needed
+# anymore — the CDN is live.)
 config :keen_phoenix_svelte,
   load_mode: :proxy,
   apps: %{
-    "greeter" => "http://localhost:4000/external/greeter/main.mjs"
+    "greeter" => "http://localhost:4000/external/greeter/main.mjs",
+    "hello" => %{
+      url: "https://apps.keen-phoenix-svelte.keenmate.dev/hello/main.mjs",
+      mode: :direct
+    },
+    "metrics" => %{
+      base: "https://apps.keen-phoenix-svelte.keenmate.dev/metrics/",
+      entry: "main.mjs",
+      mode: :proxy,
+      ttl: :timer.seconds(60)
+    }
   }
 
 # For development, we disable any cache and enable

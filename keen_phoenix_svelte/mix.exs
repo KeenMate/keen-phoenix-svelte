@@ -1,7 +1,7 @@
 defmodule KeenPhoenixSvelte.MixProject do
   use Mix.Project
 
-  @version "1.0.0-rc.3"
+  @version "1.0.0-rc.4"
   @source_url "https://github.com/KeenMate/keen-phoenix-svelte"
   @homepage_url "https://keen-phoenix-svelte.keenmate.dev"
 
@@ -58,6 +58,7 @@ defmodule KeenPhoenixSvelte.MixProject do
       extras: [
         "README.md",
         "docs/philosophy.md": [title: "Philosophy & comparison"],
+        "docs/packaging-apps.md": [title: "Island-able vs page-owning apps"],
         "docs/installation.md": [title: "Installation & setup"],
         "docs/authoring-apps.md": [title: "Authoring apps"],
         "docs/server-communication.md": [title: "Server communication"],

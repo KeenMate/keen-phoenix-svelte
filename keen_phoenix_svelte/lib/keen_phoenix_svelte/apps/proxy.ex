@@ -11,9 +11,15 @@ defmodule KeenPhoenixSvelte.Apps.Proxy do
 
       forward "/apps", KeenPhoenixSvelte.Apps.Proxy
 
-  A request to `/apps/<name>` resolves `<name>` via
-  `KeenPhoenixSvelte.Apps.upstream/1`, serves the cached bundle, and revalidates
-  it upstream when it goes stale.
+  A request resolves via `KeenPhoenixSvelte.Apps.resolve/1`, serves the cached
+  bundle, and revalidates it upstream when it goes stale. Both shapes are handled:
+
+    * `/apps/<name>` — a **single-file** app (`url:`), served as `text/javascript`.
+    * `/apps/<name>/<sub-path>` — a **base-path** app (`base:`); the sub-path is
+      appended to the upstream directory, so a whole JS + CSS + assets bundle
+      proxies through one registration. Each file's `Content-Type` is derived from
+      its extension (`.mjs`/`.js` → `text/javascript`, `.css` → `text/css`, else
+      `MIME`), while JS is always forced to a module-friendly type.
 
   The default prefix is the same `/apps` that local bundles load from. That's
   intentional and safe: `Plug.Static` runs before the router, so local files at
@@ -64,15 +70,15 @@ defmodule KeenPhoenixSvelte.Apps.Proxy do
 
   @impl true
   def call(conn, _opts) do
-    # Everything after the forward prefix is the app name (single, self-contained
-    # bundle — the library's apps are one file each).
-    name = Enum.join(conn.path_info, "/")
-
-    case Apps.upstream(name) do
+    # The path after the forward prefix resolves to a registered app: a single-file
+    # app (matched by full name) or a base-path app (matched on its first segment,
+    # the rest forwarded as a sub-path — so a whole JS+CSS+assets bundle proxies
+    # through one registration).
+    case Apps.resolve(conn.path_info) do
       nil ->
         conn |> send_resp(404, "unknown app") |> halt()
 
-      url ->
+      {name, url, _sub} ->
         serve(conn, name, url)
     end
   end
@@ -82,7 +88,7 @@ defmodule KeenPhoenixSvelte.Apps.Proxy do
 
     case ProxyCache.get(url, opts) do
       {:ok, entry} ->
-        respond(conn, entry, opts)
+        respond(conn, entry, opts, url)
 
       {:error, reason} ->
         Logger.error("[keen_phoenix_svelte] app proxy failed for #{url}: #{inspect(reason)}")
@@ -90,16 +96,27 @@ defmodule KeenPhoenixSvelte.Apps.Proxy do
     end
   end
 
-  defp respond(conn, entry, opts) do
+  defp respond(conn, entry, opts, url) do
     conn = put_validators(conn, entry, opts)
 
     if browser_current?(conn, entry) do
       conn |> send_resp(304, "") |> halt()
     else
       conn
-      # Force a module-friendly type regardless of what upstream reports.
-      |> put_resp_content_type("text/javascript")
+      |> put_resp_content_type(content_type(url))
       |> send_resp(200, entry.body)
+    end
+  end
+
+  # JS is forced to a module-friendly type regardless of what a (possibly
+  # mislabeling) origin reports; CSS and other assets in a base-path bundle keep
+  # their own type, derived from the sub-path extension.
+  defp content_type(url) do
+    case url |> URI.parse() |> Map.get(:path) |> to_string() |> Path.extname() |> String.downcase() do
+      ext when ext in [".mjs", ".js"] -> "text/javascript"
+      ".css" -> "text/css"
+      "" -> "text/javascript"
+      "." <> ext -> MIME.type(ext)
     end
   end
 

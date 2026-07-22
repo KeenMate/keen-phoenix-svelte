@@ -48,6 +48,47 @@ defmodule KeenPhoenixSvelte.AppsTest do
     assert Apps.manifest() == %{}
   end
 
+  test "resolve/1 maps a single-file app path to its upstream URL" do
+    Application.put_env(:keen_phoenix_svelte, :apps, %{"x" => "https://cdn/x.mjs"})
+    assert Apps.resolve(["x"]) == {"x", "https://cdn/x.mjs", ""}
+    assert Apps.resolve(["nope"]) == nil
+    assert Apps.resolve([]) == nil
+  end
+
+  test "base-path app: manifest points at the entry; resolve forwards sub-paths" do
+    Application.put_env(:keen_phoenix_svelte, :load_mode, :proxy)
+
+    Application.put_env(:keen_phoenix_svelte, :apps, %{
+      "player" => %{base: "https://cdn/player/", entry: "player.mjs"}
+    })
+
+    # The client imports the entry, same-origin.
+    assert Apps.manifest() == %{"player" => "/apps/player/player.mjs"}
+
+    # A bare hit resolves to the entry; a sub-path is appended to the base.
+    assert Apps.resolve(["player"]) == {"player", "https://cdn/player/player.mjs", "player.mjs"}
+
+    assert Apps.resolve(["player", "player.css"]) ==
+             {"player", "https://cdn/player/player.css", "player.css"}
+
+    assert Apps.resolve(["player", "assets", "logo.svg"]) ==
+             {"player", "https://cdn/player/assets/logo.svg", "assets/logo.svg"}
+  end
+
+  test "base-path app in :direct mode imports the entry straight from the base" do
+    Application.put_env(:keen_phoenix_svelte, :load_mode, :direct)
+    Application.put_env(:keen_phoenix_svelte, :apps, %{"player" => %{base: "https://cdn/player/"}})
+
+    # No entry given → defaults to main.mjs.
+    assert Apps.manifest() == %{"player" => "https://cdn/player/main.mjs"}
+  end
+
+  test "resolve/1 rejects path traversal in a base-path sub-path" do
+    Application.put_env(:keen_phoenix_svelte, :apps, %{"player" => %{base: "https://cdn/player/"}})
+    assert Apps.resolve(["player", "..", "secret"]) == nil
+    assert Apps.resolve(["player", "ok.css"]) == {"player", "https://cdn/player/ok.css", "ok.css"}
+  end
+
   test "proxy_opts merges per-app ttl/immutable over the global :proxy_cache config" do
     orig_cache = Application.get_env(:keen_phoenix_svelte, :proxy_cache)
     on_exit(fn -> restore(:proxy_cache, orig_cache) end)

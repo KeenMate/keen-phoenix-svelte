@@ -1,6 +1,6 @@
 {
   "name": "@keenmate/phoenix_svelte",
-  "version": "1.0.0-rc03",
+  "version": "1.0.0-rc04",
   "description": "Auto-mount compiled Svelte components into Phoenix LiveView (hook + AppsManager).",
   "type": "module",
   "main": "assets/js/keen_phoenix_svelte/index.js",

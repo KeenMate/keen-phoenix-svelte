@@ -208,6 +208,24 @@ defmodule ExampleWeb.DocsLive do
     %{k: "Server load", direct: "none (CDN edge)", proxy: "in path, cached + revalidated (ETS)"}
   ]
 
+  # What makes a bundle mountable inline. NOT about size/richness — a full applet is
+  # a fine island; a default app-build isn't. It's a packaging decision.
+  @island_rules [
+    "Mounts into the target it's handed — never #app or document.body",
+    "Exports a mount function — doesn't auto-run on import",
+    "Bundles its own deps — no reliance on page-global jQuery/Bootstrap",
+    "Assets resolved relative to itself — no absolute /css, /js root paths",
+    "Stable entry name (main.mjs), not a hashed index-a1b2c3.js",
+    "Scoped styles; routes internally, doesn't drive the browser URL bar"
+  ]
+
+  @page_owner_signs [
+    "Ships an index.html and auto-mounts to a fixed #app",
+    "Absolute root asset URLs (/css/…, /js/…, /vite.svg)",
+    "Needs page globals loaded by its own <script> tags",
+    "Hashed entry filename; wants to own the URL / history"
+  ]
+
   def mount(_params, _session, socket) do
     {:ok,
      assign(socket,
@@ -221,7 +239,9 @@ defmodule ExampleWeb.DocsLive do
        channel_client: @channel_client,
        channel_server: @channel_server,
        proxy_config: @proxy_config,
-       proxy_rows: @proxy_rows
+       proxy_rows: @proxy_rows,
+       island_rules: @island_rules,
+       page_owner_signs: @page_owner_signs
      )}
   end
 
@@ -251,6 +271,58 @@ defmodule ExampleWeb.DocsLive do
               class="link link-primary"
             >the HexDocs</a>
             and in <code>keen_phoenix_svelte/docs/</code>.
+          </p>
+        </section>
+
+        <%!-- Foundational: what can even be an island --%>
+        <section class="card bg-base-100 border border-base-300 rounded-xl p-6">
+          <div class="flex items-center gap-2">
+            <.icon name="hero-puzzle-piece" class="size-6 text-primary" />
+            <h2 class="text-lg font-semibold">First: island-able vs page-owning apps</h2>
+          </div>
+          <p class="mt-2 text-base-content/70">
+            One question decides whether a bundle can be an island at all:
+            <strong>was it built to mount into a container you hand it, or to be the whole page?</strong>
+            It's <em>not</em>
+            about size, richness, or being a "SPA" — a full file-management applet in the middle of
+            a page is a perfect island. It's a <strong>packaging</strong> decision.
+          </p>
+
+          <div class="grid gap-4 md:grid-cols-2 mt-5">
+            <div class="rounded-lg border border-primary/30 bg-primary/5 p-4">
+              <p class="font-semibold text-sm flex items-center gap-1.5">
+                <.icon name="hero-check-circle" class="size-4 text-primary" /> Island-able
+              </p>
+              <ul class="mt-2 space-y-1.5 text-sm text-base-content/70">
+                <li :for={r <- @island_rules} class="flex gap-2">
+                  <span class="text-primary">·</span>{r}
+                </li>
+              </ul>
+            </div>
+            <div class="rounded-lg border border-base-300 p-4">
+              <p class="font-semibold text-sm flex items-center gap-1.5">
+                <.icon name="hero-x-circle" class="size-4 text-base-content/40" /> Page-owning (must iframe)
+              </p>
+              <ul class="mt-2 space-y-1.5 text-sm text-base-content/70">
+                <li :for={s <- @page_owner_signs} class="flex gap-2">
+                  <span class="text-base-content/30">·</span>{s}
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          <p class="mt-4 text-sm text-base-content/60">
+            If you control the build, make it island-able (the checklist above is a <strong>library
+            build</strong>, not an app build). If you can't — or it's a whole app, not a component —
+            <strong>embed it in an iframe</strong>
+            instead; it just won't get the in-process boundary (config + messaging go over
+            <code>postMessage</code>). Full guide:
+            <a
+              href="https://hexdocs.pm/keen_phoenix_svelte/packaging-apps.html"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="link link-primary"
+            >Island-able vs page-owning apps</a>.
           </p>
         </section>
 
@@ -492,10 +564,11 @@ defmodule ExampleWeb.DocsLive do
             ETS, and re-serves it same-origin. A stale entry is <em>revalidated</em> with a
             single-flight conditional <code>GET</code> (<code>If-None-Match</code>), driven by the
             upstream's <code>Cache-Control</code>/<code>ETag</code> with a <code>:ttl</code>
-            fallback — so even an unversioned <code>…/app.js</code> is re-checked, not pinned. It's
-            the mode the
-            <.link navigate={~p"/"} class="link link-primary">home page</.link>
-            demo uses for its externally-loaded <code>greeter</code> island.
+            fallback — so even an unversioned <code>…/app.js</code> is re-checked, not pinned. The
+            <.link navigate={~p"/proxying"} class="link link-primary">Proxying</.link>
+            page shows both modes against a real external CDN — <code>metrics</code>
+            (multi-file) over <code>:proxy</code>, <code>hello</code>
+            (single-file) over <code>:direct</code> — side by side.
           </p>
 
           <pre class="mt-3 bg-base-300/50 rounded-lg p-3 overflow-x-auto text-xs"><code>{@proxy_config}</code></pre>

@@ -3,6 +3,11 @@
 An "app" is a self-contained Svelte island. It lives in a folder under
 `assets/apps/<name>/` and is discovered automatically — no central registration.
 
+> Authoring one from scratch (below) naturally produces an island. If you're trying
+> to reuse an **existing** bundle — a third-party app, or something built by another
+> team — first check it can even be an island: see
+> [Island-able vs page-owning apps](packaging-apps.md).
+
 ## Folder structure
 
 ```

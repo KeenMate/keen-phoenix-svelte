@@ -5,6 +5,13 @@ from your own static path and you configure nothing. Register an app only when
 its compiled bundle lives **elsewhere** — a shared CDN, another team's deploy, or
 a database-driven catalogue.
 
+> This guide is about *where the bytes come from*. It assumes the bundle is already
+> an island — it follows the [mount contract](authoring-apps.md#the-mount-contract)
+> and is built to be embeddable. A third-party bundle that owns the page (auto-mounts,
+> absolute asset paths, page globals) can't be proxied into an island; see
+> [Island-able vs page-owning apps](packaging-apps.md) for how to tell, and what to
+> do instead.
+
 ## The one thing that changes: the URL
 
 `AppsManager.resolve(name)` decides where to import a bundle from. The server
@@ -94,6 +101,43 @@ apps: %{
   "report"    => "https://reports.internal/report/main.mjs"   # uses load_mode
 }
 ```
+
+## Multi-file bundles: a base-path app
+
+Some bundles aren't a single self-contained module — a vendor player might ship a
+JS entry **plus** a separate stylesheet, fonts, or images. Point the registry at
+the upstream **directory** with `base:` (and, if the entry isn't `main.mjs`, an
+`entry:`), and every sub-path proxies through one registration:
+
+```elixir
+config :keen_phoenix_svelte,
+  load_mode: :proxy,
+  apps: %{
+    "player" => %{base: "https://cdn.acme.com/player@3/", entry: "player.mjs"}
+  }
+```
+
+The client imports the entry (`/apps/player/player.mjs` in `:proxy` mode), and any
+sibling the bundle references re-serves same-origin under the same prefix:
+
+| Request | Proxied to upstream |
+|---|---|
+| `/apps/player/player.mjs` | `https://cdn.acme.com/player@3/player.mjs` |
+| `/apps/player/player.css` | `https://cdn.acme.com/player@3/player.css` |
+| `/apps/player/fonts/x.woff2` | `https://cdn.acme.com/player@3/fonts/x.woff2` |
+
+Each file is typed by its extension (`.mjs`/`.js` → `text/javascript`, `.css` →
+`text/css`, otherwise `MIME`), while JS is always forced to a module-friendly type
+regardless of what the origin reports. `..` and other unsafe segments are rejected
+before any upstream fetch. Every file shares the app's cache/revalidation and
+`ttl`/`immutable` settings. A single-file app (`url:`) is unchanged — it's just the
+one-file case.
+
+> A bundle whose entry doesn't ESM-`export default` a mount function (e.g. a UMD
+> build that sets `window.SomethingCreate`) still can't mount directly — write a
+> thin adapter entry that imports the vendor files (now same-origin) and adapts
+> them to `(target, opts) => { setProps, destroy }`. Base-path proxying is what
+> gets all those files delivered.
 
 ## Notes
 

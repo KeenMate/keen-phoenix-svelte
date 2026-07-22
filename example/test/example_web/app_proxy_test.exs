@@ -57,6 +57,21 @@ defmodule ExampleWeb.AppProxyTest do
     assert response(second, 304) == ""
   end
 
+  test "a base-path app proxies sub-paths, typing each file by extension", %{conn: conn} do
+    base = "https://cdn.example/vendor-#{System.unique_integer([:positive])}/"
+    Application.put_env(:keen_phoenix_svelte, :apps, %{"vendor" => %{base: base, mode: :proxy}})
+    # The provider sees the full resolved URL (base <> sub-path).
+    Application.put_env(:keen_phoenix_svelte, :app_provider, fn url -> {:ok, "/* #{url} */"} end)
+
+    js = get(conn, "/apps/vendor/player.mjs")
+    assert response(js, 200) =~ "player.mjs"
+    assert js |> get_resp_header("content-type") |> hd() =~ "text/javascript"
+
+    css = get(conn, "/apps/vendor/player.css")
+    assert response(css, 200) =~ "player.css"
+    assert css |> get_resp_header("content-type") |> hd() =~ "text/css"
+  end
+
   test "an unknown app is 404", %{conn: conn} do
     Application.put_env(:keen_phoenix_svelte, :apps, %{})
     conn = get(conn, "/apps/does-not-exist")

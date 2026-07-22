@@ -47,7 +47,11 @@ defmodule KeenPhoenixSvelte.Apps do
           "org-chart" => "https://cdn.acme.com/islands/org-chart@1.4.2/main.mjs",
           # or override per app (per-app `ttl`/`immutable` tune the proxy cache):
           "report" => %{url: "https://reports.internal/report/main.mjs", mode: :direct},
-          "pinned" => %{url: "https://cdn.acme.com/pinned@2.0.0/main.mjs", immutable: true}
+          "pinned" => %{url: "https://cdn.acme.com/pinned@2.0.0/main.mjs", immutable: true},
+          # a multi-file bundle (JS + CSS + assets) — give a `base:` directory and
+          # (optionally) the `entry:` the client imports (defaults to "main.mjs").
+          # Any sub-path is proxied: `/apps/player/player.css` → `<base>/player.css`.
+          "player" => %{base: "https://cdn.acme.com/player@3/", entry: "player.mjs"}
         }
 
   The registry can just as well come from a database — build the same map at
@@ -78,24 +82,54 @@ defmodule KeenPhoenixSvelte.Apps do
   The client manifest — `%{name => url_the_browser_imports}`.
 
   Emitted into the page by `<KeenPhoenixSvelte.runtime>` and read by
-  `AppsManager`. In `:proxy` mode the URL is a same-origin `proxy_path/<name>`;
-  in `:direct` mode it is the configured CDN URL.
+  `AppsManager`. In `:proxy` mode the URL is a same-origin `proxy_path/<name>`
+  (for a base-path app, `proxy_path/<name>/<entry>`); in `:direct` mode it is the
+  configured CDN URL (or `<base>/<entry>`).
   """
   @spec manifest() :: %{optional(String.t()) => String.t()}
   def manifest do
-    Map.new(registered(), fn {name, %{url: url, mode: mode}} ->
-      {name, client_url(name, url, mode)}
-    end)
+    Map.new(registered(), fn {name, spec} -> {name, client_url(name, spec)} end)
   end
 
-  @doc "The upstream URL the proxy should fetch for a proxied app, or `nil` if unknown/not proxied."
+  @doc "The upstream URL the proxy should fetch for a single-file app, or `nil` if unknown/not proxied."
   @spec upstream(String.t()) :: String.t() | nil
   def upstream(name) do
     case registered()[to_string(name)] do
-      %{url: url, mode: :proxy} -> url
+      %{url: url, mode: :proxy} when is_binary(url) -> url
       # Allow proxying even a :direct app if someone hits the proxy path directly.
-      %{url: url} -> url
+      %{url: url} when is_binary(url) -> url
       _ -> nil
+    end
+  end
+
+  @doc """
+  Resolve the proxy request path (the segments after the forward prefix) to
+  `{name, upstream_url, sub_path}`, or `nil` if nothing matches.
+
+    * a **base-path** app matches on its first segment; the remaining segments are
+      appended to its `:base` (empty → the app's `:entry`), so a whole directory of
+      files (`player.mjs`, `player.css`, fonts…) proxies through one registration.
+    * a **single-file** app matches when the entire path equals its name.
+
+  Path traversal (`..`) and empty/`.`/backslash segments are rejected.
+  """
+  @spec resolve([String.t()]) :: {String.t(), String.t(), String.t()} | nil
+  def resolve([]), do: nil
+
+  def resolve([first | rest] = segments) do
+    apps = registered()
+
+    cond do
+      match?(%{base: b} when is_binary(b), apps[first]) and safe_subpath?(rest) ->
+        spec = apps[first]
+        sub = if rest == [], do: entry_of(spec), else: Enum.join(rest, "/")
+        {first, join_url(spec.base, sub), sub}
+
+      (full = Enum.join(segments, "/")) && match?(%{url: u} when is_binary(u), apps[full]) ->
+        {full, apps[full].url, ""}
+
+      true ->
+        nil
     end
   end
 
@@ -125,15 +159,40 @@ defmodule KeenPhoenixSvelte.Apps do
 
   # ---------------------------------------------------------------------------
 
-  defp client_url(_name, url, :direct), do: url
-  defp client_url(name, _url, :proxy), do: proxy_path() <> "/" <> name
+  # The URL the browser imports for an app: the CDN URL in :direct mode, a
+  # same-origin proxy path in :proxy mode (base apps point at their entry file).
+  defp client_url(_name, %{mode: :direct} = spec), do: direct_url(spec)
+
+  defp client_url(name, %{base: base} = spec) when is_binary(base),
+    do: proxy_path() <> "/" <> name <> "/" <> entry_of(spec)
+
+  defp client_url(name, _spec), do: proxy_path() <> "/" <> name
+
+  defp direct_url(%{url: url}) when is_binary(url), do: url
+  defp direct_url(%{base: base} = spec) when is_binary(base), do: join_url(base, entry_of(spec))
+
+  defp entry_of(%{entry: entry}) when is_binary(entry), do: entry
+  defp entry_of(_spec), do: "main.mjs"
+
+  defp join_url(base, ""), do: base
+
+  defp join_url(base, sub),
+    do: String.trim_trailing(base, "/") <> "/" <> String.trim_leading(sub, "/")
+
+  defp safe_subpath?(segments) do
+    Enum.all?(segments, fn seg ->
+      seg not in ["", ".", ".."] and not String.contains?(seg, "\\")
+    end)
+  end
 
   defp normalize(url) when is_binary(url),
-    do: %{url: url, mode: load_mode(), ttl: nil, immutable: false}
+    do: %{url: url, base: nil, entry: nil, mode: load_mode(), ttl: nil, immutable: false}
 
   defp normalize(%{} = spec) do
     %{
       url: spec[:url] || spec["url"],
+      base: spec[:base] || spec["base"],
+      entry: spec[:entry] || spec["entry"],
       mode: spec[:mode] || spec["mode"] || load_mode(),
       ttl: spec[:ttl] || spec["ttl"],
       immutable: spec[:immutable] || spec["immutable"] || false
