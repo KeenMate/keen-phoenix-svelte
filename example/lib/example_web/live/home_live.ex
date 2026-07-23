@@ -152,9 +152,8 @@ defmodule ExampleWeb.HomeLive do
             The three areas above are <strong>Svelte</strong>, but the mount contract is
             framework-neutral. Below are three more islands — Lit, React and vanilla JS —
             each mounted through the same <code>&lt;.app&gt;</code>
-            component. There are no per-framework variants; the optional <code>framework</code>
-            attribute is just an informational <code>data-framework</code>
-            tag. Click them — they all reach the activity bus.
+            component. There are no per-framework variants — the bundle already is
+            whatever framework it is. Click them — they all reach the activity bus.
           </p>
           <p class="text-base-content/50 text-sm mt-1">
             Each passes its own <code>&lt;:placeholder&gt;</code>
@@ -165,9 +164,9 @@ defmodule ExampleWeb.HomeLive do
 
           <div class="grid gap-4 sm:grid-cols-3 mt-5">
             <div class="card bg-base-100 border border-base-300 rounded-lg p-5">
-              <code class="text-xs text-primary">&lt;.app framework="lit"&gt;</code>
+              <code class="text-xs text-primary">&lt;.app name="kudos-lit"&gt;</code>
               <div class="mt-3">
-                <.app name="kudos-lit" id="kudos-lit-app" framework="lit" props={%{label: "Kudos"}}>
+                <.app name="kudos-lit" id="kudos-lit-app" props={%{label: "Kudos"}}>
                   <:placeholder>
                     <div class="skeleton h-9 w-32 rounded-full"></div>
                   </:placeholder>
@@ -179,9 +178,9 @@ defmodule ExampleWeb.HomeLive do
             </div>
 
             <div class="card bg-base-100 border border-base-300 rounded-lg p-5">
-              <code class="text-xs text-primary">&lt;.app framework="react"&gt;</code>
+              <code class="text-xs text-primary">&lt;.app name="reactions-react"&gt;</code>
               <div class="mt-3">
-                <.app name="reactions-react" id="reactions-react-app" framework="react" props={%{}}>
+                <.app name="reactions-react" id="reactions-react-app" props={%{}}>
                   <:placeholder>
                     <div class="flex gap-2">
                       <div class="skeleton h-9 w-14 rounded-lg"></div>
@@ -196,9 +195,9 @@ defmodule ExampleWeb.HomeLive do
             </div>
 
             <div class="card bg-base-100 border border-base-300 rounded-lg p-5">
-              <code class="text-xs text-primary">&lt;.app framework="js"&gt;</code>
+              <code class="text-xs text-primary">&lt;.app name="hello-js"&gt;</code>
               <div class="mt-3">
-                <.app name="hello-js" id="hello-js-app" framework="js" props={%{}}>
+                <.app name="hello-js" id="hello-js-app" props={%{}}>
                   <:placeholder>
                     <div class="skeleton h-14 w-full rounded-lg"></div>
                   </:placeholder>

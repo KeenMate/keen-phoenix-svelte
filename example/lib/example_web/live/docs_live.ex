@@ -121,7 +121,7 @@ defmodule ExampleWeb.DocsLive do
 
   @contract "(target, { props, context, live, api, channel, bus, el }) => { setProps, destroy }"
 
-  @heex_snippet ~S|<.app name="kudos-lit" id="kudos-1" framework="lit" props={%{label: "Kudos"}} />|
+  @heex_snippet ~S|<.app name="kudos-lit" id="kudos-1" props={%{label: "Kudos"}} />|
 
   # `live` — piggyback on the LiveView's own websocket. Request/reply + server
   # pushes, no extra endpoint. `null` on a plain page, so pair it with an `api`
@@ -508,11 +508,6 @@ defmodule ExampleWeb.DocsLive do
           <ul class="mt-3 text-sm text-base-content/70 list-disc pl-5 space-y-1">
             <li><code>name</code> — the folder under <code>assets/apps/</code>.</li>
             <li><code>id</code> — required, unique and stable (the LiveView hook keys on it).</li>
-            <li>
-              <code>framework</code>
-              — optional, informational only (becomes a <code>data-framework</code>
-              attribute).
-            </li>
             <li>
               <code>props</code>
               — small config. For big datasets pass an id and let the island fetch/subscribe.

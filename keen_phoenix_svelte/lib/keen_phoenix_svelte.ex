@@ -47,9 +47,7 @@ defmodule KeenPhoenixSvelte do
 
   This is the one and only island component. It is **framework-neutral**: the
   bundle can be Svelte, Lit, React or vanilla JS, and it is rendered and mounted
-  identically regardless — the framework never changes the wiring. Set the
-  optional `framework` attribute only if you want a `data-framework` tag for
-  debugging/inspection; it has no effect on behavior.
+  identically regardless — the framework never changes the wiring.
 
   ## Attributes
 
@@ -58,8 +56,6 @@ defmodule KeenPhoenixSvelte do
       `KeenPhoenixSvelte.Apps`).
     * `id` (required) - unique, stable DOM id (LiveView hooks require it).
     * `props` - a map passed to the app. Defaults to `%{}`.
-    * `framework` - optional label emitted as `data-framework` (informational
-      only; the runtime never reads it).
     * `class` - optional class list on the wrapper div.
     * `tag` - wrapper element, defaults to `"div"`.
 
@@ -101,7 +97,6 @@ defmodule KeenPhoenixSvelte do
   attr :name, :string, required: true
   attr :id, :string, required: true
   attr :props, :map, default: %{}
-  attr :framework, :string, default: nil
   attr :class, :any, default: nil
   attr :tag, :string, default: "div"
   attr :rest, :global
@@ -110,6 +105,12 @@ defmodule KeenPhoenixSvelte do
     doc: "Markup shown until the island mounts. Overrides the server-wide default."
 
   def app(assigns) do
+    # Record this app as used on the current render so `<.runtime preload={:auto}>`
+    # can preload exactly the bundles this page mounts. A per-process, deduped side
+    # effect; the page body renders before the root layout's <head>, so the runtime
+    # sees the full set (see the "Preloading bundles" section on runtime/1).
+    track_used_app(assigns.name)
+
     # Normalize the slot so app/1 is safe to call directly (as a plain function),
     # where the placeholder slot may never be set.
     placeholder = Map.get(assigns, :placeholder, [])
@@ -135,7 +136,6 @@ defmodule KeenPhoenixSvelte do
       phx-hook="KeenSvelte"
       phx-update="ignore"
       data-app={@name}
-      data-framework={@framework}
       data-props={Jason.encode!(@props)}
       {@rest}
     >
@@ -196,22 +196,34 @@ defmodule KeenPhoenixSvelte do
 
   An island's bundle is normally fetched *lazily* by the client — on a LiveView
   page that `import()` doesn't fire until the socket connects and the hook mounts,
-  so the download starts hundreds of ms into the page. Set `preload` to have the
-  browser fetch the bundles **during initial HTML parse** instead, via
+  so the download starts hundreds of ms into the page. `preload` has the browser
+  fetch the bundles **during initial HTML parse** instead, via
   `<link rel="modulepreload">`, so the bytes are cached by the time the hook runs
-  (the render still waits on mount — you're only moving the *download* earlier):
+  (the render still waits on mount — you're only moving the *download* earlier).
 
-      <KeenPhoenixSvelte.runtime context={@ctx} preload={["metrics", "chat"]} />
+  By default this is **automatic**: every `<.app>` rendered on the page records
+  itself, and `<.runtime>` preloads exactly those bundles — no per-page list to
+  maintain, and nothing preloaded that the page doesn't mount:
+
+      <KeenPhoenixSvelte.runtime context={@ctx} />
+
+  Auto-detection works because the page body (where the `<.app>` tags live) is
+  rendered *before* the root layout's `<head>` (where `<.runtime>` goes), so the
+  runtime already knows which islands the page mounted. Keep `<.runtime>` in a
+  layout that **wraps** the page content (the standard root-layout placement) — if
+  it renders before the `<.app>` tags, auto sees nothing and preloads nothing
+  (harmless: it just falls back to lazy loading).
 
   `preload` accepts:
 
-    * `false` (default) — emit nothing.
-    * a **list of app names** — preload exactly those (scope it to the islands on
-      *this* page). Registered apps use their manifest URL; an unregistered local
-      app falls back to `base_path/<name>/main.mjs`.
-    * `true` — preload every app in the manifest. Only registered/external apps are
-      known server-side, so this can't cover unregistered local apps; and it
-      over-fetches if the registry holds apps not on this page. Prefer the list.
+    * `:auto` (default) — the apps actually rendered on this page. The right choice
+      almost always; scopes to exactly what's on the page with no manual list.
+    * a **list of app names** — preload exactly those. Use it to override auto
+      (e.g. preload an app a later interaction will mount). Registered apps use
+      their manifest URL; a local app falls back to `base_path/<name>/main.mjs`.
+    * `true` — preload every app in the manifest, whether or not it's on this page.
+      Rarely what you want; auto is page-scoped and needs no registry.
+    * `false` — emit nothing (opt back into fully lazy loading).
 
   A cross-origin (`:direct`) URL gets `crossorigin="anonymous"` so the preload's
   credentials mode matches the module `import()` and the fetch is actually reused.
@@ -226,9 +238,9 @@ defmodule KeenPhoenixSvelte do
   attr :id, :string, default: "keen-context"
 
   attr :preload, :any,
-    default: false,
+    default: :auto,
     doc:
-      "Emit <link rel=modulepreload> for app bundles: `false` (none), a list of app names, or `true` (all manifest apps)."
+      "Emit <link rel=modulepreload> for app bundles: `:auto` (default — the apps actually rendered on this page), a list of app names, `true` (all manifest apps), or `false` (none)."
 
   def runtime(assigns) do
     manifest = KeenPhoenixSvelte.Apps.manifest()
@@ -236,7 +248,7 @@ defmodule KeenPhoenixSvelte do
     assigns =
       assigns
       |> assign(:apps_manifest, manifest)
-      |> assign(:preloads, preload_links(manifest, assigns.preload))
+      |> assign(:preloads, preload_links(manifest, resolve_preload(assigns.preload)))
 
     ~H"""
     <link
@@ -257,6 +269,23 @@ defmodule KeenPhoenixSvelte do
     </script>
     """
   end
+
+  # Per-render collector of the apps mounted on the page, so `preload={:auto}`
+  # preloads exactly what's used. `app/1` writes here during the body render, which
+  # completes before the root layout's <head> (and thus <.runtime>) is rendered.
+  @used_apps_key {__MODULE__, :used_apps}
+
+  defp track_used_app(name) do
+    used = Process.get(@used_apps_key, MapSet.new())
+    Process.put(@used_apps_key, MapSet.put(used, to_string(name)))
+  end
+
+  # `:auto` (the default) → the apps this page actually rendered; anything else
+  # (`false` / list / `true`) is passed through to `preload_links/2` unchanged.
+  defp resolve_preload(:auto),
+    do: Process.get(@used_apps_key, MapSet.new()) |> MapSet.to_list()
+
+  defp resolve_preload(other), do: other
 
   # Resolve `preload` into `[%{href, crossorigin}]`. A list scopes to named apps
   # (registered → manifest URL, else the local base-path fallback, mirroring

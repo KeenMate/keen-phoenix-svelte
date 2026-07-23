@@ -40,19 +40,21 @@ instead of only being resolvable by the naming convention.
 
 ## When the bundle actually loads
 
-The bundle is fetched **lazily** — the `import()` runs in the hook's `mounted()`,
-which on a LiveView can't happen until the socket connects and the view mounts. So
-the download starts well into the page load. `preload` moves the *download* (not
-the render) up to initial HTML parse:
+Without preloading the bundle is fetched **lazily** — the `import()` runs in the
+hook's `mounted()`, which on a LiveView can't happen until the socket connects and
+the view mounts, so the download starts well into the page load. By default
+`<KeenPhoenixSvelte.runtime>` preloads the bundles for the islands **on this page**
+(`preload={:auto}`), moving the *download* (not the render) up to initial HTML
+parse:
 
 ```mermaid
 sequenceDiagram
   participant B as Browser
   participant P as Phoenix
   B->>P: GET page
-  P-->>B: HTML with keen-apps manifest
+  P-->>B: HTML + keen-apps manifest + modulepreload (auto)
   Note over B: parse HTML
-  opt preload set
+  opt preload on (default for on-page apps)
     B->>P: modulepreload fetches bundle in parallel
   end
   B->>P: connect LiveView socket
@@ -61,6 +63,11 @@ sequenceDiagram
   B->>P: import bundle (instant if preloaded)
   Note over B: mount, first render
 ```
+
+> Preloading is automatic and page-scoped: each `<.app>` records itself as it
+> renders and `<.runtime>` emits `<link rel="modulepreload">` for exactly those
+> bundles. Opt out with `preload={false}`, or override with an explicit list — see
+> [`runtime/1`](KeenPhoenixSvelte.html#runtime/1-preloading-bundles).
 
 ## The one thing that changes: the URL
 

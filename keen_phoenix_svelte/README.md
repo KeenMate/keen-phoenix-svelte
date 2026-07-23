@@ -23,9 +23,8 @@ override), so there's no flash of empty container.
 Svelte is the first-class, tooled path, but the mount boundary is
 **framework-neutral** — an island's entry just default-exports
 `(target, opts) => { setProps, destroy }`. Because every island mounts through
-that one contract, there's a single component, `<.app>` (an optional
-`framework="…"` attribute just tags `data-framework` for debugging). The demo
-mounts Svelte, Lit, React and vanilla-JS islands through it.
+that one contract, there's a single component, `<.app>`. The demo mounts Svelte,
+Lit, React and vanilla-JS islands through it.
 
 > **New here, or comparing this to `live_svelte`?** Start with
 > **[Philosophy & comparison](docs/philosophy.md)** — the autonomous-island model,
@@ -56,12 +55,15 @@ Two cooperating halves:
   `data-app`, JSON `data-props`); `<KeenPhoenixSvelte.runtime>` emits the page context.
 - **JS** — the `KeenSvelte` hook mounts the island inside a LiveView and `AppsManager`
   lazily `import()`s `/apps/<name>/main.mjs` (or a registered URL); `mountStatic()`
-  mounts islands on plain pages. Only the bundles on a page are fetched — and any
-  framework's bundle mounts through the same `(target, opts) => { setProps, destroy }`
-  contract.
+  mounts islands on plain pages. Only the bundles on a page are fetched.
 
-`phx-update="ignore"` keeps LiveView out of the Svelte-owned subtree; the hook
-drives mount / prop-update / teardown across live navigation.
+Neither half is Svelte-specific: the bundle it mounts can be **Svelte, React, Lit,
+Vue, or vanilla JS**, because every island mounts through the same framework-neutral
+`(target, opts) => { setProps, destroy }` contract. `<.app>` is the one component for
+all of them.
+
+`phx-update="ignore"` keeps LiveView out of the island's subtree; the hook drives
+mount / prop-update / teardown across live navigation.
 
 Unlike `live_svelte`, this is the **island** model — no `~V` sigil, no
 server-rendered slots, no SSR Node runtime.

@@ -33,6 +33,11 @@ def static_paths, do: ~w(assets apps fonts images favicon.ico robots.txt)
 
 Compiled apps are served from `priv/static/apps/<name>/main.mjs`.
 
+> Only needed for **local** apps (bundles you build into `priv/static/apps/`).
+> Apps loaded from a CDN — `:direct` (browser → CDN) or `:proxy` (served by the
+> router `forward`, see [External apps](external-apps.md)) — aren't served by
+> `Plug.Static`, so you can skip this if you use no local apps.
+
 ## 2. JavaScript
 
 Add the npm package plus your Svelte toolchain (`assets/package.json`):
@@ -50,21 +55,35 @@ Add the npm package plus your Svelte toolchain (`assets/package.json`):
 }
 ```
 
-Register the hook (`assets/js/app.js`):
+Register the hook in your **existing** `assets/js/app.js` — the one `mix phx.new`
+generated. You don't rewrite the file; you add just **three** things (marked
+`// ← add` below). Everything else here is already in the generated file:
 
 ```js
-import { getHooks, mountStatic } from "@keenmate/phoenix_svelte"
+import {Socket} from "phoenix"                                    // already there
+import {LiveSocket} from "phoenix_live_view"                      // already there
+import { getHooks, mountStatic } from "@keenmate/phoenix_svelte"  // ← add
 
-const liveSocket = new LiveSocket("/live", Socket, {
-  params: { _csrf_token: csrfToken },
-  hooks: { ...getHooks() },
+// already there — Phoenix reads the token from the <meta name="csrf-token">
+// tag in root.html.heex. (This is the socket's CSRF; the island `api` helper's
+// token is context.csrf_token, emitted separately by <.runtime>.)
+const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
+
+const liveSocket = new LiveSocket("/live", Socket, {                // already there
+  params: {_csrf_token: csrfToken},                                // already there
+  hooks: { ...getHooks() },                                        // ← add ...getHooks() to your existing hooks
 })
-liveSocket.connect()
+liveSocket.connect()                                               // already there
 
-// Mount apps on plain (non-LiveView) pages. Harmless on LiveView pages —
-// elements inside a LiveView are skipped and mounted by the hook instead.
+// ← add — mount islands on plain (non-LiveView) pages. Harmless on LiveView
+// pages: elements inside a LiveView are skipped and mounted by the hook instead.
 mountStatic()
 ```
+
+To summarize, the three additions are: the `import` line, spreading `...getHooks()`
+into your existing `hooks: {}`, and a `mountStatic()` call after `connect()`. (If
+your app already has hooks — e.g. `hooks: {...colocatedHooks}` — just add
+`...getHooks()` alongside them: `hooks: {...colocatedHooks, ...getHooks()}`.)
 
 ## 3. Build the Svelte apps
 
@@ -95,6 +114,47 @@ watchers: [
   node: ["builder.js", "-m", "dev", "-w", cd: Path.expand("../assets", __DIR__)]
 ]
 ```
+
+`builder.js` is a plain CommonJS script (it uses `require`), so keep
+`assets/package.json` **without** `"type": "module"` — the `.mjs` Vite config is
+ESM regardless of that field, so both coexist under the default (CommonJS) package.
+
+### Wire the build into mix (one-shot + production)
+
+The watcher only covers `mix phx.server`. For one-shot builds, `mix setup`, and
+**production** (`mix assets.deploy`), add two npm scripts and call them from your
+mix asset aliases — otherwise a release ships with **no island bundles**.
+
+`assets/package.json`:
+
+```json
+"scripts": {
+  "dev": "node builder.js -m dev -w",
+  "prod": "node builder.js -m prod"
+}
+```
+
+`mix.exs` aliases (install the npm deps in setup; build the islands in both
+`assets.build` and `assets.deploy`):
+
+```elixir
+"assets.setup": [
+  "tailwind.install --if-missing",
+  "esbuild.install --if-missing",
+  "cmd --cd assets npm install"
+],
+"assets.build": ["compile", "tailwind my_app", "esbuild my_app", "cmd --cd assets npm run prod"],
+"assets.deploy": [
+  "tailwind my_app --minify",
+  "esbuild my_app --minify",
+  "cmd --cd assets npm run prod",
+  "phx.digest"
+]
+```
+
+> For `esbuild` to bundle `@keenmate/phoenix_svelte` into your `app.js`, the npm
+> package must be installed under `assets/node_modules` — that's what the
+> `npm install` in `assets.setup` (and your initial `npm install`) is for.
 
 ## 4. (Optional) runtime context
 

@@ -1,5 +1,4 @@
-import { svelte } from "@sveltejs/vite-plugin-svelte";
-import sveltePreprocess from "svelte-preprocess";
+import { svelte, vitePreprocess } from "@sveltejs/vite-plugin-svelte";
 
 /**
  * Shared Vite config factory for building one Svelte app as a self-contained
@@ -35,7 +34,7 @@ export function appConfig({ appName, mode, outDir } = {}) {
       svelte({
         // Inject component styles via JS instead of emitting a .css file.
         emitCss: false,
-        preprocess: sveltePreprocess({ sourceMap: !production }),
+        preprocess: vitePreprocess({ sourceMap: !production }),
         compilerOptions: { dev: !production },
       }),
     ],

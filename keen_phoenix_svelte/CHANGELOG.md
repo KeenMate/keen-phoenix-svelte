@@ -5,6 +5,52 @@ All notable changes to `keen_phoenix_svelte` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0-rc.5] - 2026-07-23
+
+### Removed
+
+- **`framework` attribute on `<.app>`** — it only emitted a `data-framework` tag
+  the runtime never read (mounting is identical for every framework via the shared
+  contract), so it added markup and API surface for no behavior. Drop it from any
+  `<.app framework="…">` call; the app's bundle already is whatever framework it is.
+
+### Added
+
+- **Automatic, page-scoped preloading** — `<.runtime preload={:auto}>` (now the
+  **default**) preloads exactly the island bundles a page actually mounts, with no
+  per-page list to maintain. Each `<.app>` records itself as it renders; because the
+  page body renders before the root layout's `<head>`, `<.runtime>` already knows the
+  set and emits `<link rel="modulepreload">` only for those apps. A page with no
+  islands preloads nothing. Explicit `preload={[…]}` / `true` / `false` still work
+  (a list is the override for preloading an app a later interaction will mount).
+
+### Changed
+
+- **`preload` now defaults to `:auto`** (was `false`). Bundles on a page are
+  preloaded during initial HTML parse by default; opt out with `preload={false}`.
+  Only apps rendered on the page are ever preloaded, so this is a strict
+  load-time improvement — and it silently no-ops (falls back to lazy loading) if
+  `<.runtime>` is placed before the page's `<.app>` tags.
+
+### Fixed
+
+- **Vite helper no longer needs `svelte-preprocess`** — `@keenmate/phoenix_svelte/vite`
+  (`appConfig`) imported `svelte-preprocess`, which is not a dependency of the
+  package and is not installed by the documented `assets/package.json`, so the
+  documented published-install build failed with `Cannot find package
+  'svelte-preprocess'`. The helper now uses `vitePreprocess` from
+  `@sveltejs/vite-plugin-svelte` (already required), matching the example's inlined
+  config — no extra dependency, no build break.
+
+### Docs
+
+- **Installation — production/setup build wiring** — `installation.md` now documents
+  the `npm` `scripts` (`dev`/`prod`) and the `mix` alias wiring (`assets.setup` →
+  `npm install`; `assets.build`/`assets.deploy` → `npm run prod`) needed to build the
+  island bundles for one-shot, `mix setup`, and `mix assets.deploy`. Without the
+  `assets.deploy` step a release shipped with no island bundles. Also notes that
+  `builder.js` is CommonJS, so `assets/package.json` must stay non-`"type": "module"`.
+
 ## [1.0.0-rc.4] - 2026-07-22 [PUBLISHED]
 
 ### Added
