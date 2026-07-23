@@ -30,6 +30,13 @@ Lit, React and vanilla-JS islands through it.
 > **[Philosophy & comparison](docs/philosophy.md)** — the autonomous-island model,
 > what this deliberately doesn't do, and how it differs from `live_svelte`.
 
+## What's New in v1.0.0-rc.5
+
+- **Automatic, page-scoped preloading — on by default** — `<KeenPhoenixSvelte.runtime>` now defaults to `preload={:auto}`: each `<.app>` records itself as it renders and the runtime emits `<link rel="modulepreload">` for exactly the islands on that page, so bundles download during initial HTML parse with no per-page list to maintain. A page with no islands preloads nothing; opt out with `preload={false}` or override with an explicit list.
+- **Vite helper build fix — the documented published install works** — `@keenmate/phoenix_svelte/vite` no longer imports the undeclared `svelte-preprocess` (which failed with `Cannot find package`); it uses `vitePreprocess` from the Svelte plugin you already depend on, so `appConfig` builds with just the documented dependencies.
+- **One fewer attribute — `<.app framework="…">` removed** — it only emitted a `data-framework` tag the runtime never read, so it was API surface for no behavior. Drop it; a bundle already *is* whatever framework it is.
+- **Install docs — production build wiring (no more missing bundles)** — `installation.md` now documents the npm `scripts` and `mix` alias wiring (`assets.setup`/`build`/`deploy`) that builds islands for `mix setup` and releases — previously `mix assets.deploy` shipped none. Plus a clearer app.js edit (which lines you add vs. Phoenix's generated ones) and a note that `static_paths` `apps` is only needed for local apps.
+
 ## What's New in v1.0.0-rc.4
 
 - **Base-path proxy — proxy a whole multi-file bundle** — A registered app can name an upstream *directory* with `base:` (+ optional `entry:`); every sub-path re-serves same-origin, so a vendor bundle's JS entry plus its stylesheet, fonts, and images all proxy through one registration.
@@ -38,14 +45,6 @@ Lit, React and vanilla-JS islands through it.
 - **`<.runtime preload={…}>` — fetch island bundles during initial HTML parse** — Emit `<link rel="modulepreload">` for on-page islands so the browser downloads them in parallel instead of waiting for the LiveView hook's lazy `import()`. Cross-origin bundles get `crossorigin` so the preload is actually reused.
 - **One island component, `<.app>`** — The `<.svelte>` alias is removed; every island (Svelte, React, Lit, vanilla) mounts through the single framework-neutral `<.app>`. In your `Layouts` module (which defines its own `app/1`), call it fully-qualified as `<KeenPhoenixSvelte.app>`.
 - **Docs — one authoring guide, a packaging litmus, and diagrams** — "Authoring apps" now covers building an island in *any* framework (Vite library mode + React/Lit/Vue/vanilla recipes); a new "Island-able vs page-owning apps" guide draws the line on what can be an island; and the guides render Mermaid diagrams of how apps resolve and load.
-
-## What's New in v1.0.0-rc.3
-
-- **Proxy cache with revalidation — `:proxy` mode now works for unversioned upstreams** — Registered proxied bundles are cached in ETS and *revalidated* rather than pinned forever: a stale entry triggers a single-flight conditional `GET` (`If-None-Match`/`If-Modified-Since`), so a `304` keeps the bytes and a `200` swaps them, with concurrent requests collapsed into one upstream fetch. Freshness follows the upstream's `Cache-Control`/`ETag`, falling back to a `:ttl` (default 5 min) — so a bare `cdn/app.js` with no version in its URL is re-checked on a cadence instead of cached for a year.
-- **End-to-end conditional-request chain** — The proxy forwards an `ETag` (synthesizing a weak one when the origin ships none) and answers the browser's `If-None-Match` with a `304`, so browser → Phoenix → origin all revalidate cheaply. This replaces the old fixed 1-year `immutable` header; a per-app `immutable: true` opts truly-versioned URLs back into it.
-- **Bounded proxy memory** — Cache entries upsert by URL (refreshes never grow the table) and a periodic sweep evicts URLs no longer in the registry, so a rotating DB-driven app registry stays bounded to its working set.
-- **Renamed to speak "app", not "island"** — `KeenPhoenixSvelte.IslandProxy` → `KeenPhoenixSvelte.Apps.Proxy`, config `:island_provider` → `:app_provider` (which now also accepts a 2-arity conditional-fetch form), and the proxy-path default `/keen-islands` → `/apps` (it shares the `base_path` prefix). Update your router `forward`.
-- **Package metadata / links** — corrected the `:source_url` casing, added `homepage_url`, and a `Website` link to the live demo.
 
 ## How it works
 
