@@ -4,9 +4,9 @@
 [Hex](https://hex.pm/packages/keen_phoenix_svelte) ·
 [HexDocs](https://hexdocs.pm/keen_phoenix_svelte)
 
-Auto-mount compiled **Svelte 5** apps into **Phoenix** — on both **LiveView** and
-plain controller-rendered pages — as self-contained islands, each handed a user
-context and a standardized way to talk to the server.
+Auto-mount compiled **Svelte** (React, Lit, …) apps into **Phoenix** — on both
+**LiveView** and plain controller-rendered pages — as self-contained islands, each
+handed a user context and a standardized way to talk to the server.
 
 You write:
 

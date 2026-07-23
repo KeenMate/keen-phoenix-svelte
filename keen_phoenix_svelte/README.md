@@ -4,8 +4,8 @@
 [Hex](https://hex.pm/packages/keen_phoenix_svelte) ·
 [HexDocs](https://hexdocs.pm/keen_phoenix_svelte)
 
-Auto-mount compiled **Svelte** apps into **Phoenix** — on both **LiveView** and
-plain controller-rendered pages — as self-contained islands.
+Auto-mount compiled **Svelte** (React, Lit, …) apps into **Phoenix** — on both
+**LiveView** and plain controller-rendered pages — as self-contained islands.
 
 Write this in a template:
 

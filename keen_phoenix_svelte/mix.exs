@@ -14,7 +14,7 @@ defmodule KeenPhoenixSvelte.MixProject do
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       description:
-        "Auto-mount compiled Svelte components into Phoenix LiveView via a hook + function component.",
+        "Auto-mount compiled Svelte (React, Lit, …) apps into Phoenix — LiveView + plain pages — via a hook + function component.",
       package: package(),
       name: "KeenPhoenixSvelte",
       source_url: @source_url,
