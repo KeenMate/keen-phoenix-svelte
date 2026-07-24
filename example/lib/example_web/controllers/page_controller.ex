@@ -11,4 +11,37 @@ defmodule ExampleWeb.PageController do
   def calendar_plain(conn, _params) do
     render(conn, :calendar_plain)
   end
+
+  @doc """
+  Plain-page twin of `ProxyingLive`. Renders the same two islands (`hello` +
+  `metrics`) and the same load-stats panel, but as a dead controller page — so
+  the islands mount via `mountStatic()` the instant `app.js` runs, instead of
+  waiting for the LiveView hook to fire after the socket connects.
+
+  The `watch` / `preload_apps` assigns are built exactly as in `ProxyingLive`,
+  so the only variable between the two pages is *what triggers the mount*.
+  """
+  def proxying_plain(conn, _params) do
+    manifest = KeenPhoenixSvelte.Apps.manifest()
+
+    hello? = Map.has_key?(manifest, "hello")
+    metrics? = Map.has_key?(manifest, "metrics")
+
+    watch =
+      [
+        hello? &&
+          %{name: "hello", container: "hello-app", match: "/hello/main.mjs", label: ":direct"},
+        metrics? &&
+          %{name: "metrics", container: "metrics-app", match: "/apps/metrics/main.mjs", label: ":proxy"}
+      ]
+      |> Enum.filter(& &1)
+
+    conn
+    |> assign(:hello?, hello?)
+    |> assign(:metrics?, metrics?)
+    |> assign(:watch, watch)
+    |> assign(:preload_apps, Enum.map(watch, & &1.name))
+    |> assign(:page_title, "Proxying (plain)")
+    |> render(:proxying_plain)
+  end
 end

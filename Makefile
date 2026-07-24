@@ -15,7 +15,7 @@ HEX_VERSION := $(shell grep -E '^\s*@version\s+"' $(LIB)/mix.exs | head -1 | sed
 NPM_VERSION := $(shell grep -E '"version"\s*:' $(LIB)/package.json | head -1 | sed -E 's/.*"version"\s*:\s*"([^"]+)".*/\1/')
 
 .DEFAULT_GOAL := help
-.PHONY: help setup dev server sync-lib build-assets test clean docs \
+.PHONY: help setup dev server kill-port sync-lib build-assets test clean docs \
         hex-deps hex-compile hex-build-docs hex-docs hex-build hex-build-inspect \
         hex-publish-dry hex-publish-rc hex-publish \
         npm-pack npm-publish-rc npm-publish \
@@ -28,6 +28,7 @@ help:
 	@echo "Example app (Phoenix demo):"
 	@echo "  setup             Fetch deps, npm install, build assets"
 	@echo "  dev / server      Start the Phoenix server (http://localhost:4000)"
+	@echo "  kill-port         Free the server port (default $(PORT); override with PORT=xxxx)"
 	@echo "  sync-lib          Re-copy the library JS into node_modules (after editing library JS)"
 	@echo "  build-assets      Build Svelte apps + JS + CSS (re-syncs the library first)"
 	@echo "  test              Run the example test suite (the shared publish gate)"
@@ -66,6 +67,24 @@ dev: server
 
 server:
 	cd $(EXAMPLE) && mix phx.server
+
+# The Phoenix dev server port (override: `make kill-port PORT=4001`).
+PORT ?= 4000
+
+# Free the server port. Kills whatever is LISTENING on $(PORT) — covers both
+# IPv4 (0.0.0.0:$(PORT)) and IPv6 ([::]:$(PORT)). This Makefile runs recipes in
+# bash (SHELL := bash), so even on Windows we drive netstat/taskkill from bash;
+# MSYS_NO_PATHCONV stops Git Bash from mangling taskkill's /F and /PID flags.
+kill-port:
+	@echo "Freeing port $(PORT)..."
+ifeq ($(OS),Windows_NT)
+	-@export MSYS_NO_PATHCONV=1; \
+	  netstat -ano | grep -E ":$(PORT) .*LISTENING" | awk '{print $$5}' | sort -u \
+	    | xargs -r -I{} taskkill /F /PID {}
+else
+	-@lsof -ti tcp:$(PORT) | xargs -r kill -9
+endif
+	@echo "Port $(PORT) is free"
 
 # The npm `@keenmate/phoenix_svelte` dep is a `file:` package installed with
 # --install-links, i.e. a real COPY in node_modules — NOT a symlink (that avoids

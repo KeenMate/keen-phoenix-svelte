@@ -49,6 +49,12 @@ defmodule ExampleWeb.Router do
     # Plain (non-LiveView) page — the calendar island mounts via mountStatic().
     get "/calendar-plain", PageController, :calendar_plain
 
+    # Plain-page twin of /proxying — same islands + load-stats panel, but the
+    # islands mount via mountStatic() instead of the LiveView hook. Lets you
+    # isolate how much of "first render" is LiveView-connect overhead vs the
+    # island's own module-eval + mount cost.
+    get "/proxying-plain", PageController, :proxying_plain
+
     # Demo-only identity switch (not authentication).
     post "/session/switch", SessionController, :switch
     # Language switch — stores the locale in the session.

@@ -47,6 +47,18 @@ liveSocket.connect()
 // deferred script, so the DOM is already parsed.
 mountStatic()
 
+// Plain-page load-stats panel (/proxying-plain): no LiveView hook fires on a
+// dead page, so run the same ProxyLoadStats logic manually. Object.create lets
+// its this-based methods (mounted/render) resolve off the hook object, with
+// `el` as the only instance state. The LiveView /proxying panel uses phx-hook
+// (and no data-proxy-load-stats attr), so this never double-mounts it.
+const plainStats = document.querySelector("[data-proxy-load-stats]")
+if (plainStats) {
+  const runner = Object.create(ProxyLoadStats)
+  runner.el = plainStats
+  runner.mounted()
+}
+
 // expose liveSocket on window for web console debug logs and latency simulation:
 // >> liveSocket.enableDebug()
 // >> liveSocket.enableLatencySim(1000)  // enabled for duration of browser session

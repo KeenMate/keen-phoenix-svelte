@@ -140,6 +140,12 @@ defmodule ExampleWeb.Layouts do
                   label={I18n.t(@locale, "nav.proxying")}
                 />
                 <.nav_item
+                  navigate={~p"/proxying-plain"}
+                  active={@active == :proxying_plain}
+                  icon="hero-bolt"
+                  label={I18n.t(@locale, "nav.proxyingPlain")}
+                />
+                <.nav_item
                   navigate={~p"/docs"}
                   active={@active == :docs}
                   icon="hero-book-open"
