@@ -58,9 +58,29 @@ defmodule KeenPhoenixSvelte do
     * `props` - a map passed to the app. Defaults to `%{}`.
     * `class` - optional class list on the wrapper div.
     * `tag` - wrapper element, defaults to `"div"`.
+    * `eager` - mount **before** the LiveView socket connects. Defaults to `false`.
 
   Any other attribute (e.g. `data-*`, `style`) is forwarded to the wrapper via
   the `:global` attribute.
+
+  ## Eager mounting
+
+  By default, on a LiveView page the island mounts from the `KeenSvelte` hook's
+  `mounted()` — which cannot run until the socket connects and the view mounts.
+  On a cold first load that connect round-trip is often the biggest slice of the
+  delay between "bundle loaded" and "first paint".
+
+  With `eager={true}`, the island is mounted immediately by `mountStatic()` (as
+  the deferred `app.js` parses), the same path a plain page uses — so it paints
+  without waiting for the socket. It mounts with `live: null` and a boundary
+  field `liveStatus: "pending"`; once the socket connects, the hook hands it the
+  live bridge and dispatches a `keen:live-ready` event on the wrapper element.
+
+  Use it for islands that don't need `live` to render their first frame — e.g.
+  ones that fetch from `api`, a `channel`, or a different server entirely. An
+  island that *must* have `live` to paint should stay on the default (non-eager)
+  path. On a plain page `eager` is a no-op (there is never a `live` there;
+  `liveStatus` is `"none"`). See the guide *External apps → First render*.
 
   ## Placeholder / loader (no flash of empty container)
 
@@ -99,6 +119,7 @@ defmodule KeenPhoenixSvelte do
   attr :props, :map, default: %{}
   attr :class, :any, default: nil
   attr :tag, :string, default: "div"
+  attr :eager, :boolean, default: false
   attr :rest, :global
 
   slot :placeholder,
@@ -137,6 +158,7 @@ defmodule KeenPhoenixSvelte do
       phx-update="ignore"
       data-app={@name}
       data-props={Jason.encode!(@props)}
+      data-eager={@eager}
       {@rest}
     >
       <%= cond do %>

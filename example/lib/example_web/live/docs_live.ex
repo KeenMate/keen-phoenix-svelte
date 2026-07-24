@@ -15,7 +15,8 @@ defmodule ExampleWeb.DocsLive do
     %{name: "target", desc: "The element to mount into. You own everything inside it."},
     %{name: "props", desc: "Small per-island config from <.app props={…}> — config, not payload."},
     %{name: "context", desc: "Page-wide user, CSRF, tokens, api_base and socket — emitted once per page."},
-    %{name: "live", desc: "The LiveView bridge: pushEvent / handleEvent / upload. null on plain pages."},
+    %{name: "live", desc: "The LiveView bridge: pushEvent / handleEvent / upload. null on plain pages (and initially on an eager mount)."},
+    %{name: "liveStatus", desc: "\"ready\" | \"pending\" | \"none\" — whether live is here now, coming on connect (eager), or never (plain page)."},
     %{name: "api", desc: "REST helper; attaches x-csrf-token + the session cookie."},
     %{name: "channel", desc: "Promise-based Phoenix channel factory with auto cid correlation."},
     %{name: "bus", desc: "Page-wide client-side event bus for island-to-island messaging — no server."}
@@ -122,6 +123,27 @@ defmodule ExampleWeb.DocsLive do
   @contract "(target, { props, context, live, api, channel, bus, el }) => { setProps, destroy }"
 
   @heex_snippet ~S|<.app name="kudos-lit" id="kudos-1" props={%{label: "Kudos"}} />|
+
+  @eager_snippet ~S|<.app name="dashboard" id="dash" eager props={%{unit: @unit}} />|
+
+  # Consuming eager mode: paint now, adopt `live` when it arrives. `liveStatus`
+  # says whether to wait for it (pending), use it now (ready), or never (none).
+  @eager_client """
+  export default (target, { liveStatus, live, el, api }) => {
+    render(target);                      // draw the first frame immediately
+
+    if (liveStatus === "pending") {      // eager: the live bridge is on its way
+      showConnectingHint();
+      el.addEventListener("keen:live-ready", (e) => {
+        wireLiveEvents(e.detail.live);   // now safe to pushEvent / handleEvent
+        hideConnectingHint();
+      });
+    } else if (liveStatus === "none") {  // plain page — no live at all
+      loadOverREST(api);                 // use api / a channel / another server
+    }
+    // liveStatus === "ready": live is already here, use it directly.
+  };\
+  """
 
   # `live` — piggyback on the LiveView's own websocket. Request/reply + server
   # pushes, no extra endpoint. `null` on a plain page, so pair it with an `api`
@@ -234,6 +256,8 @@ defmodule ExampleWeb.DocsLive do
        frameworks: @frameworks,
        contract: @contract,
        heex_snippet: @heex_snippet,
+       eager_snippet: @eager_snippet,
+       eager_client: @eager_client,
        live_client: @live_client,
        live_server: @live_server,
        channel_client: @channel_client,
@@ -515,9 +539,89 @@ defmodule ExampleWeb.DocsLive do
           </ul>
         </section>
 
+        <%!-- When it mounts: eager vs default --%>
+        <section>
+          <h2 class="text-xl font-semibold">6 · When it mounts (eager vs default)</h2>
+          <p class="text-base-content/60 mt-1">
+            On a LiveView the first HTTP response is a <strong>full server render</strong> — you
+            see the page and the island's <em>placeholder</em>
+            right away. But the island's JS only mounts when the <code>KeenSvelte</code>
+            hook runs, and the hook can't run until the <strong>socket connects</strong>. On a
+            cold load that connect is usually the biggest slice of the wait between placeholder
+            and live island.
+          </p>
+
+          <div class="mt-4 rounded-lg border border-primary/30 bg-primary/5 p-4">
+            <p class="text-sm text-base-content/70">
+              <code>&lt;.app eager&gt;</code>
+              mounts the island <strong>before</strong>
+              connect — the same early path a plain page uses — so it paints without waiting. It
+              starts with <code>live: null</code>
+              and <code>liveStatus: "pending"</code>; when the socket connects the hook hands it
+              the <code>live</code>
+              bridge and dispatches a <code>keen:live-ready</code>
+              event on the element.
+            </p>
+            <pre class="mt-3 bg-base-300/50 rounded-lg p-3 overflow-x-auto text-xs"><code>{@eager_snippet}</code></pre>
+          </div>
+
+          <div class="overflow-x-auto mt-4">
+            <table class="table table-sm bg-base-100 border border-base-300 rounded-lg">
+              <thead>
+                <tr>
+                  <th></th>
+                  <th><code class="text-primary">default</code></th>
+                  <th><code class="text-primary">eager</code></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td class="font-medium text-base-content/70">First paint</td>
+                  <td class="text-base-content/70">after socket connect</td>
+                  <td class="text-base-content/70">at <code>app.js</code> parse</td>
+                </tr>
+                <tr>
+                  <td class="font-medium text-base-content/70"><code>live</code> at first paint</td>
+                  <td class="text-base-content/70">yes (<code>liveStatus: "ready"</code>)</td>
+                  <td class="text-base-content/70">
+                    no — arrives on connect (<code>"pending"</code> → <code>keen:live-ready</code>)
+                  </td>
+                </tr>
+                <tr>
+                  <td class="font-medium text-base-content/70">Use it when</td>
+                  <td class="text-base-content/70">the first frame needs <code>live</code></td>
+                  <td class="text-base-content/70">
+                    the island draws from <code>api</code> / a <code>channel</code> / another server
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <p class="text-base-content/60 mt-4">
+            Consuming it is optional — read <code>liveStatus</code>, and if it's
+            <code>"pending"</code>
+            wait for the event before touching <code>live</code>. Server-pushed
+            <em>prop</em>
+            changes (<code>setProps</code>) keep working the whole time; only the imperative
+            <code>live.*</code> calls need the bridge.
+          </p>
+          <pre class="mt-3 bg-base-300/50 rounded-lg p-3 overflow-x-auto text-xs leading-relaxed"><code>{@eager_client}</code></pre>
+
+          <p class="text-sm text-base-content/50 mt-3">
+            The <.link navigate={~p"/eager"} class="link link-primary">Eager mount</.link>
+            page mounts the same island both ways side by side, timed — watch the eager copy paint
+            first and turn "live" a moment later. The
+            <.link navigate={~p"/proxying"} class="link link-primary">Proxying</.link>
+            (LiveView) vs
+            <a href="/proxying-plain" class="link link-primary">Proxying (plain)</a>
+            pages show the same gap between a LiveView mount and a plain-page mount.
+          </p>
+        </section>
+
         <%!-- Proxy / external apps --%>
         <section>
-          <h2 class="text-xl font-semibold">6 · External apps & the proxy</h2>
+          <h2 class="text-xl font-semibold">7 · External apps & the proxy</h2>
           <p class="text-base-content/60 mt-1">
             By default an island is local — imported from <code>/apps/&lt;name&gt;/main.mjs</code>
             on your own static path, no config. You only <em>register</em>

@@ -36,51 +36,48 @@ export function mountStatic(root) {
 export const KeenSvelte = {
   mounted() {
     const name = this.el.dataset.app;
-    this.el.__keenMounted = true;
 
     // Tracks server->client subscriptions so we can remove them on destroy.
     this.eventRefs = [];
     // Last raw props JSON, to skip redundant re-renders.
     this.lastRaw = this.el.dataset.props || "{}";
+    // Bridge handed to the component so it can talk to the server over the
+    // LiveView socket. Only exists here, in the hook — hence eager islands mount
+    // with live:null and get it later (see below).
+    this.live = buildLive(this);
 
-    // Bridge handed to the Svelte component so it can talk to the server over
-    // the LiveView socket.
-    this.live = {
-      // Push to the parent LiveView.
-      pushEvent: (event, payload, onReply) =>
-        this.pushEvent(event, payload, onReply),
+    // Eager path: mountStatic() already mounted this island (with live:null)
+    // before the socket connected, so it has painted. Don't re-mount — adopt the
+    // existing instance and hand it the live bridge, then announce it.
+    if (this.el.__keenEager) {
+      this.el.__keenMounted = true;
+      Promise.resolve(this.el.__keenReady).then((instance) => {
+        if (!instance) return; // eager mount failed; nothing to upgrade
+        this.instance = instance;
+        if (typeof instance.setLive === "function") instance.setLive(this.live);
+        // Announce that the live bridge is now available (liveStatus pending ->
+        // ready). Apps can listen instead of (or as well as) implementing setLive
+        // — e.g. to hide a "connecting" loader.
+        this.el.dispatchEvent(
+          new CustomEvent("keen:live-ready", { detail: { live: this.live } })
+        );
+        // Flush any prop change that arrived before the instance resolved.
+        if (this.pendingProps) {
+          applyProps(instance, this.pendingProps);
+          this.pendingProps = null;
+        }
+      });
+      return;
+    }
 
-      // Push to a specific LiveComponent/element. Defaults to this component's
-      // own root element, so islands inside a LiveComponent reach *its*
-      // handle_event/3 rather than the parent LiveView.
-      pushEventTo: (target, event, payload, onReply) =>
-        this.pushEventTo(target || this.el, event, payload, onReply),
-
-      // Subscribe to a server-pushed event. The ref is tracked and removed
-      // automatically on destroy (prevents leaks / double-fires on remount).
-      handleEvent: (event, callback) => {
-        const ref = this.handleEvent(event, callback);
-        this.eventRefs.push(ref);
-        return ref;
-      },
-      removeHandleEvent: (ref) => {
-        this.removeHandleEvent(ref);
-        this.eventRefs = this.eventRefs.filter((r) => r !== ref);
-      },
-
-      // Drive LiveView uploads from the component.
-      upload: (name, files) => this.upload(name, files),
-      uploadTo: (target, name, files) =>
-        this.uploadTo(target || this.el, name, files),
-
-      el: this.el,
-    };
-
+    // Default path: mount now that the hook (and thus live) is available.
+    this.el.__keenMounted = true;
     appsManager
       .create(name, this.el, {
         props: parse(this.lastRaw),
         context: getContext(),
         live: this.live,
+        liveStatus: "ready",
         api: getApi(),
         channel: getChannel(),
         bus: getBus(),
@@ -124,6 +121,40 @@ function parse(raw) {
   } catch (_e) {
     return {};
   }
+}
+
+// Builds the `live` bridge from a hook instance. Extracted so both the default
+// and eager mount paths share one definition. All calls delegate to the hook's
+// own LiveView methods, which only exist once the hook has mounted.
+function buildLive(hook) {
+  return {
+    // Push to the parent LiveView.
+    pushEvent: (event, payload, onReply) => hook.pushEvent(event, payload, onReply),
+
+    // Push to a specific LiveComponent/element. Defaults to this component's own
+    // root element, so islands inside a LiveComponent reach *its* handle_event/3
+    // rather than the parent LiveView.
+    pushEventTo: (target, event, payload, onReply) =>
+      hook.pushEventTo(target || hook.el, event, payload, onReply),
+
+    // Subscribe to a server-pushed event. The ref is tracked and removed
+    // automatically on destroy (prevents leaks / double-fires on remount).
+    handleEvent: (event, callback) => {
+      const ref = hook.handleEvent(event, callback);
+      hook.eventRefs.push(ref);
+      return ref;
+    },
+    removeHandleEvent: (ref) => {
+      hook.removeHandleEvent(ref);
+      hook.eventRefs = hook.eventRefs.filter((r) => r !== ref);
+    },
+
+    // Drive LiveView uploads from the component.
+    upload: (name, files) => hook.upload(name, files),
+    uploadTo: (target, name, files) => hook.uploadTo(target || hook.el, name, files),
+
+    el: hook.el,
+  };
 }
 
 // The app entry returns a "handle" describing how to update/tear down the

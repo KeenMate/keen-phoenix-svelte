@@ -69,6 +69,70 @@ sequenceDiagram
 > bundles. Opt out with `preload={false}`, or override with an explicit list — see
 > [`runtime/1`](KeenPhoenixSvelte.html#runtime/1-preloading-bundles).
 
+## First render: LiveView vs a plain page
+
+Preloading moves the *download* early, but on a LiveView the *render* still waits
+for the socket. It helps to separate the two loads a first LiveView hit does:
+
+1. **Dead render (HTTP).** The first request is plain HTTP. The LiveView runs
+   `mount/3` (`connected?(socket) == false`) and `render/1` on the server and
+   returns a **complete HTML page** — painted immediately. Each `<.app>` div is in
+   that HTML *with its `<:placeholder>` skeleton*, because the wrapper is
+   server-rendered and `phx-update="ignore"`. The island itself is **not** here:
+   this library does no SSR, so the Svelte app is client-only.
+2. **Connected render (WebSocket).** `liveSocket.connect()` opens the socket, the
+   server runs `mount/3` **again** (`connected?(socket) == true`) and patches the
+   DOM. Only *after* that patch do hooks fire — so `KeenSvelte.mounted()` (and thus
+   the island `import()` + first paint) happens here, not on the initial HTML.
+
+So on a LiveView page the user sees a **full page with a placeholder** instantly,
+and the island content swaps in **after the socket connects**. That connect +
+mount round-trip — not the bundle, which preloading already has cached — is the
+bulk of the delay between "bundle loaded" and "first render".
+
+A **plain (non-LiveView) page** has the same dead render, but no connected phase:
+[`mountStatic()`](authoring-apps.md) swaps the placeholder for the island the
+instant the deferred `app.js` parses — no socket to wait for. Same app, same
+bytes, earlier paint. The island mounts with [`live: null`](server-communication.md#the-app-boundary)
+and reaches the server over `api` / `channel` instead.
+
+The example app demonstrates the difference directly: **`/proxying`** (a LiveView)
+and **`/proxying-plain`** (a plain controller page) render the *same* two islands
+with an in-browser load-stats panel, so you can compare the `first render` delta
+side by side. The island that needs the `live` bridge pays for the connect; one
+that doesn't can live on a plain page and skip it.
+
+### Eager mounting: paint before connect, on a LiveView
+
+You don't have to move an island to a plain page to skip the connect wait.
+[`<.app eager>`](KeenPhoenixSvelte.html#app/1-eager-mounting) mounts the island on
+a LiveView page via the same early `mountStatic()` path — it paints at `app.js`
+parse time, then the hook upgrades it with the `live` bridge once the socket
+connects (firing [`keen:live-ready`](server-communication.md#livestatus-and-eager-mounting)).
+So you get the plain-page first-paint *and* keep `live`:
+
+```heex
+<.app name="dashboard" id="dash" eager props={%{unit: @unit}} />
+```
+
+| mode | first paint | `live` at first paint |
+| --- | --- | --- |
+| default | after socket connect | yes (`liveStatus: "ready"`) |
+| `eager` | at `app.js` parse | no — arrives on connect (`"pending"` → `keen:live-ready`) |
+
+**When it's safe (and when it isn't).** Eager suits an island whose first render
+doesn't depend on `live` — e.g. one that fetches from `api`, joins a `channel`, or
+calls **a different server entirely** (its own REST endpoint, a CDN, a third-party
+API). Those transports are available immediately, connect or not, so mounting
+early costs nothing. An island that must `pushEvent` to *this* LiveView just to
+draw its first frame should stay on the default path (or show a loader while
+`liveStatus === "pending"`). On a plain page `eager` is a no-op — there is no
+`live` there at all (`liveStatus: "none"`).
+
+The **`/eager`** page in the example mounts the same island both ways side by side,
+with the load-stats panel, so you can watch the eager copy paint first and turn
+"live" a moment later.
+
 ## The one thing that changes: the URL
 
 `AppsManager.resolve(name)` decides where to import a bundle from. The server

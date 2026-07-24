@@ -5,6 +5,29 @@ All notable changes to `keen_phoenix_svelte` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0-rc.6] - 2026-07-24 [PUBLISHED]
+
+### Added
+
+- **Eager mounting — `<.app eager>`** — mount an island *before* the LiveView
+  socket connects, so it paints at `app.js` parse time (the same early path a
+  plain page uses) instead of waiting for the `KeenSvelte` hook to fire on
+  connect. It mounts with `live: null` and `liveStatus: "pending"`; when the
+  socket connects the hook hands it the `live` bridge and dispatches a
+  `keen:live-ready` event on the element. For islands whose first frame doesn't
+  need `live` — they fetch from `api`, a `channel`, or another server entirely.
+  A no-op on plain pages (there is no `live` there at all).
+- **`liveStatus` in the app boundary** — every island now receives
+  `liveStatus: "ready" | "pending" | "none"`, telling it whether `live` is
+  available now, arriving on connect (an eager mount), or never present (a plain
+  page) — enough to show a loader while `"pending"` and pick its transport.
+- **`keen:live-ready` event and optional `setLive(live)` handle method** — the two
+  ways an eagerly-mounted island receives its `live` bridge once the socket
+  connects: listen for the `CustomEvent` on the island element (`detail.live`), or
+  expose a `setLive(live)` method on your mount handle and the hook calls it.
+  Server-pushed prop updates (`setProps`) keep working throughout; only the
+  imperative `live.*` calls need the bridge.
+
 ## [1.0.0-rc.5] - 2026-07-23 [PUBLISHED]
 
 ### Removed
@@ -344,6 +367,8 @@ islands, on both LiveView and plain controller-rendered pages.
 - External-service token delivery (a server-minted token for a *different*
   service in `context.tokens.*`) — planned, not yet implemented.
 
+[1.0.0-rc.6]: https://github.com/KeenMate/keen-phoenix-svelte/releases/tag/v1.0.0-rc.6
+[1.0.0-rc.5]: https://github.com/KeenMate/keen-phoenix-svelte/releases/tag/v1.0.0-rc.5
 [1.0.0-rc.4]: https://github.com/KeenMate/keen-phoenix-svelte/releases/tag/v1.0.0-rc.4
 [1.0.0-rc.3]: https://github.com/KeenMate/keen-phoenix-svelte/releases/tag/v1.0.0-rc.3
 [1.0.0-rc.2]: https://github.com/KeenMate/keen-phoenix-svelte/releases/tag/v1.0.0-rc.2

@@ -14,18 +14,42 @@
       </div>
       <p class="mt-3 text-base-content/70">
         This is the <strong>plain-page twin</strong>
-        of <.link href={~p"/proxying"} class="link link-primary">/proxying</.link>. The
-        exact same two islands, the same modulepreload, the same load-stats panel — but this
-        is a dead <strong>controller-rendered page</strong>, so the islands mount via
-        <code>mountStatic()</code>
-        the instant <code>app.js</code>
-        runs, instead of waiting for the <code>KeenSvelte</code>
-        LiveView hook to fire after the socket connects.
+        of <.link href={~p"/proxying"} class="link link-primary">/proxying</.link>: the
+        exact same two islands, the same <code>modulepreload</code>, the same load-stats
+        panel — but rendered by a plain controller, not a LiveView. Open both and compare the
+        <strong>first render</strong>
+        delta. It's a live illustration of <em>when</em> an island paints.
       </p>
-      <p class="mt-3 text-base-content/70">
-        Compare the <strong>first render</strong>
-        deltas here against the LiveView page. If the gap collapses, that time was
-        LiveView-connect overhead — not the island itself.
+      <div class="mt-4 grid gap-3 sm:grid-cols-2">
+        <div class="rounded-lg border border-base-300 bg-base-100 p-4">
+          <div class="text-sm font-semibold flex items-center gap-1.5">
+            <.icon name="hero-bolt-slash" class="size-4 text-base-content/50" /> LiveView (/proxying)
+          </div>
+          <p class="mt-1.5 text-sm text-base-content/70">
+            The first HTTP hit is a full server render — you see the page and the island's
+            <strong>placeholder</strong>
+            at once. The Svelte app only mounts when the <code>KeenSvelte</code>
+            hook fires, which can't happen until the <strong>socket connects</strong>
+            and the view mounts. That connect round-trip is the gap.
+          </p>
+        </div>
+        <div class="rounded-lg border border-base-300 bg-base-100 p-4">
+          <div class="text-sm font-semibold flex items-center gap-1.5">
+            <.icon name="hero-bolt" class="size-4 text-primary" /> Plain page (this page)
+          </div>
+          <p class="mt-1.5 text-sm text-base-content/70">
+            Same full server render + placeholder, but no socket phase:
+            <code>mountStatic()</code>
+            swaps the placeholder for the island the instant the deferred
+            <code>app.js</code>
+            parses. Same app, same bytes — it just mounts with
+            <code>live: null</code>.
+          </p>
+        </div>
+      </div>
+      <p class="mt-4 text-sm text-base-content/60">
+        Neither page ever shows a blank screen — the shell and placeholder are
+        server-rendered. What differs is only <strong>when the island content appears</strong>.
       </p>
     </section>
 
@@ -101,15 +125,19 @@
         Both pages render identical islands with an identical <code>modulepreload</code>.
         The only difference is <strong>what triggers the mount</strong>.
       </p>
+      <:wire label="dead render">
+        The first HTTP hit server-renders the full page — shell + island
+        <code>&lt;:placeholder&gt;</code>. Identical on both pages.
+      </:wire>
       <:wire label="mountStatic">
-        Scans <code>[data-app]</code>
+        On a plain page, scans <code>[data-app]</code>
         as soon as the deferred <code>app.js</code>
         parses — no socket, no round-trip.
       </:wire>
       <:wire label="LiveView hook">
         On <code>/proxying</code>, the island mounts only after
         <code>liveSocket.connect()</code>
-        and the LiveView client mount.
+        and the connected mount patch.
       </:wire>
       <:wire label="what to read">
         The <code>first render</code>

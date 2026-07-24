@@ -31,7 +31,8 @@ The mount fn receives one options object:
 | --- | --- |
 | `props` | per-component config from `<.app props={...} />` |
 | `context` | the page-wide runtime context above |
-| `live` | LiveView bridge, or **`null`** on plain (non-LiveView) pages |
+| `live` | LiveView bridge, or **`null`** on plain pages (and initially on an eager mount) |
+| `liveStatus` | `"ready"` \| `"pending"` \| `"none"` — whether `live` is here, coming, or never (see below) |
 | `api` | REST helper to your Phoenix backend (CSRF + session) |
 | `channel` | `channel(topic, params)` factory over a Phoenix socket (lazy connect) |
 | `el` | the root element |
@@ -71,6 +72,46 @@ def handle_event("toggle_like", %{"id" => id}, socket) do
   {:reply, %{liked: liked}, assign(socket, ...)}
 end
 ```
+
+### `liveStatus` and eager mounting
+
+Normally the island mounts from the `KeenSvelte` hook, which only runs after the
+LiveView socket connects — so `live` is present from the first frame
+(`liveStatus: "ready"`). With [`<.app eager>`](KeenPhoenixSvelte.html#app/1-eager-mounting)
+the island instead mounts *before* connect, to paint sooner. It then starts with
+`live: null` and `liveStatus: "pending"`, and the bridge arrives later.
+
+`liveStatus` tells the app which situation it's in at mount:
+
+| value | meaning | what an app does |
+| --- | --- | --- |
+| `"ready"` | `live` is available now | use `live` immediately |
+| `"pending"` | eager mount; `live` is coming on connect | render now (optionally a loader), wait for it |
+| `"none"` | plain page; there is no `live` at all | use `api` / `channel` / another server |
+
+When an eager island's bridge becomes available, the library fires a
+**`keen:live-ready`** `CustomEvent` on the island's element (`el`), with
+`detail.live`. Listen for it to swap a loader for live UI:
+
+```js
+export default (target, { live, liveStatus, el }) => {
+  let bridge = live;                       // null while "pending"
+  if (liveStatus === "pending") {
+    el.addEventListener("keen:live-ready", (e) => {
+      bridge = e.detail.live;              // now safe to pushEvent/handleEvent
+      // hide the loader, wire up server-pushed events, etc.
+    });
+  }
+  // ...
+};
+```
+
+As an alternative to the event, if the handle you return exposes a `setLive(live)`
+method the hook calls it with the same bridge when it upgrades the island.
+
+Server-pushed **prop** changes (`updated()` → `setProps`) work regardless of
+`liveStatus`, so an eager island still re-renders on assign changes even before —
+and after — the bridge arrives. Only the imperative `live.*` calls need it.
 
 ## `api` — REST to your backend
 

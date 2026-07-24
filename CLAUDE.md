@@ -53,18 +53,26 @@ Two cooperating halves:
   scans `[data-app]` (skipping `[data-phx-session]`) and mounts with `live: null`.
 
 **Mount contract** — every app's entry default-exports
-`(target, { props, context, live, api, channel, el }) => handle`, where `handle`
-is `{ setProps, destroy }` (Svelte-version-agnostic; the hook falls back to
-`$set`/`$destroy` for Svelte 4). Apps live in `example/assets/apps/<name>/js/`.
+`(target, { props, context, live, liveStatus, api, channel, el }) => handle`, where
+`handle` is `{ setProps, destroy }` (plus optional `setLive` for eager mounts;
+Svelte-version-agnostic — the hook falls back to `$set`/`$destroy` for Svelte 4).
+Apps live in `example/assets/apps/<name>/js/`.
 
 **The app boundary** (what an island gets):
 - `props` — small per-component config (config, **not** payload)
 - `context` — page-wide user/tokens/csrf/api_base/socket
-- `live` — LiveView bridge (`pushEvent`/`handleEvent`+auto-cleanup/`upload`), or `null` on plain pages
+- `live` — LiveView bridge (`pushEvent`/`handleEvent`+auto-cleanup/`upload`), or `null` on plain pages **and initially on an eager mount**
+- `liveStatus` — `"ready"` (live is here) / `"pending"` (eager; coming on connect) / `"none"` (plain page)
 - `api` — REST helper (attaches `x-csrf-token` + session cookie)
 - `channel` — Phoenix channel factory (envelope-agnostic; auto `cid`)
 
 Pattern: `if (live) { live.pushEvent(...) } else { api.post(...) }`.
+
+**Eager mounting** — `<.app eager>` mounts on a LiveView page *before* the socket
+connects (via `mountStatic()`), so it paints without waiting for the hook. Starts
+with `live: null` / `liveStatus: "pending"`; the hook later upgrades it and fires a
+`keen:live-ready` event (`detail.live`) on `el`. For islands that don't need `live`
+to render (they use `api`/`channel`/another server). Demo: `/eager`.
 
 ## Conventions & gotchas (learned the hard way)
 

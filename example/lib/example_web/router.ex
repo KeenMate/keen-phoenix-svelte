@@ -43,6 +43,7 @@ defmodule ExampleWeb.Router do
       live "/videos", VideosLive, :index
       live "/calendar", CalendarLive, :index
       live "/proxying", ProxyingLive, :index
+      live "/eager", EagerLive, :index
       live "/docs", DocsLive, :index
     end
 
@@ -50,9 +51,9 @@ defmodule ExampleWeb.Router do
     get "/calendar-plain", PageController, :calendar_plain
 
     # Plain-page twin of /proxying — same islands + load-stats panel, but the
-    # islands mount via mountStatic() instead of the LiveView hook. Lets you
-    # isolate how much of "first render" is LiveView-connect overhead vs the
-    # island's own module-eval + mount cost.
+    # islands mount via mountStatic() instead of the LiveView hook. A permanent
+    # demo of mount timing: how much of "first render" is the LiveView connect +
+    # mount round-trip vs the island's own module-eval + render cost.
     get "/proxying-plain", PageController, :proxying_plain
 
     # Demo-only identity switch (not authentication).

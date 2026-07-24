@@ -13,13 +13,16 @@ defmodule ExampleWeb.PageController do
   end
 
   @doc """
-  Plain-page twin of `ProxyingLive`. Renders the same two islands (`hello` +
-  `metrics`) and the same load-stats panel, but as a dead controller page — so
-  the islands mount via `mountStatic()` the instant `app.js` runs, instead of
-  waiting for the LiveView hook to fire after the socket connects.
+  Plain-page twin of `ProxyingLive`, and a permanent demo of island **mount
+  timing**. Renders the same two islands (`hello` + `metrics`) and the same
+  load-stats panel, but as a dead controller page — so the islands mount via
+  `mountStatic()` the instant `app.js` runs, instead of waiting for the LiveView
+  hook to fire after the socket connects.
 
   The `watch` / `preload_apps` assigns are built exactly as in `ProxyingLive`,
-  so the only variable between the two pages is *what triggers the mount*.
+  so the only variable between the two pages is *what triggers the mount* — which
+  the `first render` delta in the load-stats panel makes visible. See the
+  "First render: LiveView vs a plain page" section of `docs/external-apps.md`.
   """
   def proxying_plain(conn, _params) do
     manifest = KeenPhoenixSvelte.Apps.manifest()

@@ -146,6 +146,12 @@ defmodule ExampleWeb.Layouts do
                   label={I18n.t(@locale, "nav.proxyingPlain")}
                 />
                 <.nav_item
+                  navigate={~p"/eager"}
+                  active={@active == :eager}
+                  icon="hero-rocket-launch"
+                  label={I18n.t(@locale, "nav.eager")}
+                />
+                <.nav_item
                   navigate={~p"/docs"}
                   active={@active == :docs}
                   icon="hero-book-open"
@@ -197,6 +203,8 @@ defmodule ExampleWeb.Layouts do
   defp header_title(locale, active, _title)
        when active in [:home, :chat, :videos, :calendar, :proxying, :docs],
        do: I18n.t(locale, "nav.#{active}")
+
+  defp header_title(locale, :eager, _title), do: I18n.t(locale, "nav.eager")
 
   defp header_title(_locale, _active, title), do: title || ""
 

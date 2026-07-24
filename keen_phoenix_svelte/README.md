@@ -30,21 +30,18 @@ Lit, React and vanilla-JS islands through it.
 > **[Philosophy & comparison](docs/philosophy.md)** — the autonomous-island model,
 > what this deliberately doesn't do, and how it differs from `live_svelte`.
 
+## What's New in v1.0.0-rc.6
+
+- **Eager mounting — paint before the socket connects** — `<.app eager>` mounts an island the instant `app.js` parses instead of waiting for the LiveView hook, collapsing the cold-load gap between the server-rendered placeholder and the live island. It starts without `live` and is upgraded once the socket connects — ideal for islands that draw from `api`, a `channel`, or another server. A no-op on plain pages.
+- **`liveStatus` on the boundary** — every island now knows whether `live` is here (`"ready"`), coming (`"pending"`, an eager mount), or never present (`"none"`, a plain page) — enough to show a loader while waiting and choose the right transport.
+- **`keen:live-ready`** — a `CustomEvent` (with `detail.live`), plus an optional `setLive(live)` handle method, fired when an eagerly-mounted island's `live` bridge arrives. Server-pushed prop updates keep flowing the whole time; only imperative `live.*` calls need the bridge.
+
 ## What's New in v1.0.0-rc.5
 
 - **Automatic, page-scoped preloading — on by default** — `<KeenPhoenixSvelte.runtime>` now defaults to `preload={:auto}`: each `<.app>` records itself as it renders and the runtime emits `<link rel="modulepreload">` for exactly the islands on that page, so bundles download during initial HTML parse with no per-page list to maintain. A page with no islands preloads nothing; opt out with `preload={false}` or override with an explicit list.
 - **Vite helper build fix — the documented published install works** — `@keenmate/phoenix_svelte/vite` no longer imports the undeclared `svelte-preprocess` (which failed with `Cannot find package`); it uses `vitePreprocess` from the Svelte plugin you already depend on, so `appConfig` builds with just the documented dependencies.
 - **One fewer attribute — `<.app framework="…">` removed** — it only emitted a `data-framework` tag the runtime never read, so it was API surface for no behavior. Drop it; a bundle already *is* whatever framework it is.
 - **Install docs — production build wiring (no more missing bundles)** — `installation.md` now documents the npm `scripts` and `mix` alias wiring (`assets.setup`/`build`/`deploy`) that builds islands for `mix setup` and releases — previously `mix assets.deploy` shipped none. Plus a clearer app.js edit (which lines you add vs. Phoenix's generated ones) and a note that `static_paths` `apps` is only needed for local apps.
-
-## What's New in v1.0.0-rc.4
-
-- **Base-path proxy — proxy a whole multi-file bundle** — A registered app can name an upstream *directory* with `base:` (+ optional `entry:`); every sub-path re-serves same-origin, so a vendor bundle's JS entry plus its stylesheet, fonts, and images all proxy through one registration.
-- **Local `dir:` source — serve a content-hashed bundle from disk** — Point an app at a local directory (a mounted volume another process rebuilds) with an `entry:` glob; the newest match wins, so `bundle.a1b2c3.js` resolves without knowing the hash. It reuses the proxy cache — the file's mtime is the validator, `:ttl` the re-scan cadence.
-- **Unified app manifest — local and registered apps in one map** — `Apps.manifest/0` now merges folder-detected local apps with registered ones (set `otp_app:` so the library can locate them). One authoritative map for the client, `preload`, and tooling; a registered entry wins on a name clash.
-- **`<.runtime preload={…}>` — fetch island bundles during initial HTML parse** — Emit `<link rel="modulepreload">` for on-page islands so the browser downloads them in parallel instead of waiting for the LiveView hook's lazy `import()`. Cross-origin bundles get `crossorigin` so the preload is actually reused.
-- **One island component, `<.app>`** — The `<.svelte>` alias is removed; every island (Svelte, React, Lit, vanilla) mounts through the single framework-neutral `<.app>`. In your `Layouts` module (which defines its own `app/1`), call it fully-qualified as `<KeenPhoenixSvelte.app>`.
-- **Docs — one authoring guide, a packaging litmus, and diagrams** — "Authoring apps" now covers building an island in *any* framework (Vite library mode + React/Lit/Vue/vanilla recipes); a new "Island-able vs page-owning apps" guide draws the line on what can be an island; and the guides render Mermaid diagrams of how apps resolve and load.
 
 ## How it works
 

@@ -105,27 +105,50 @@ function parseProps(el) {
 }
 
 /**
- * Fallback mount for plain (non-LiveView) pages, where `phx-hook` never fires.
- * Mounts every `[data-app]` element that is NOT managed by a LiveView (those get
- * the KeenSvelte hook instead) and hasn't been mounted already. `live` is null
- * here — apps fall back to `api` / their own transport.
+ * Early mount for `[data-app]` elements, called once after the DOM is ready.
+ *
+ * Two cases mount here:
+ *   * **Plain (non-LiveView) pages** — `phx-hook` never fires, so every island
+ *     mounts here with `live: null` (`liveStatus: "none"`); apps fall back to
+ *     `api` / their own transport.
+ *   * **Eager islands on a LiveView page** (`<.app eager>`, i.e. `data-eager`) —
+ *     mounted here too, *before* the socket connects, so they paint without
+ *     waiting for the hook. They start with `live: null` and `liveStatus:
+ *     "pending"`; the `KeenSvelte` hook later upgrades them with the live bridge
+ *     (see index.js) and fires a `keen:live-ready` event.
+ *
+ * Non-eager LiveView islands are skipped — the hook mounts those once connected.
+ * The resolved handle and a readiness promise are stashed on the element
+ * (`__keenInstance` / `__keenReady`) so the hook can adopt an eager instance.
  */
 export function mountStatic(appsManager, root = document) {
   root.querySelectorAll("[data-app]").forEach((el) => {
     if (el.__keenMounted) return;
-    if (el.closest("[data-phx-session]")) return; // LiveView-managed
-    el.__keenMounted = true;
+    const inLiveView = !!el.closest("[data-phx-session]");
+    const eager = el.hasAttribute("data-eager");
+    if (inLiveView && !eager) return; // LiveView-managed — the hook mounts it
 
-    appsManager
+    el.__keenMounted = true;
+    if (inLiveView && eager) el.__keenEager = true;
+
+    el.__keenReady = appsManager
       .create(el.dataset.app, el, {
         props: parseProps(el),
         context: getContext(),
         live: null,
+        // "pending" = eager, live bridge is coming on connect; "none" = plain
+        // page, there is no live here at all. Apps can show a loader for the
+        // former and go straight to REST for the latter.
+        liveStatus: el.__keenEager ? "pending" : "none",
         api: getApi(),
         channel: getChannel(),
         bus: getBus(),
         el,
       })
-      .catch((err) => console.error(err));
+      .then((instance) => (el.__keenInstance = instance))
+      .catch((err) => {
+        console.error(err);
+        return null;
+      });
   });
 }
