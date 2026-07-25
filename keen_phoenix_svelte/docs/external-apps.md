@@ -59,7 +59,7 @@ sequenceDiagram
   end
   B->>P: connect LiveView socket
   P-->>B: join, mount, patch DOM
-  Note over B: KeenSvelte.mounted runs
+  Note over B: KeenApp.mounted runs
   B->>P: import bundle (instant if preloaded)
   Note over B: mount, first render
 ```
@@ -82,7 +82,7 @@ for the socket. It helps to separate the two loads a first LiveView hit does:
    this library does no SSR, so the Svelte app is client-only.
 2. **Connected render (WebSocket).** `liveSocket.connect()` opens the socket, the
    server runs `mount/3` **again** (`connected?(socket) == true`) and patches the
-   DOM. Only *after* that patch do hooks fire — so `KeenSvelte.mounted()` (and thus
+   DOM. Only *after* that patch do hooks fire — so `KeenApp.mounted()` (and thus
    the island `import()` + first paint) happens here, not on the initial HTML.
 
 So on a LiveView page the user sees a **full page with a placeholder** instantly,

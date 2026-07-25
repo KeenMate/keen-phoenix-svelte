@@ -5,7 +5,7 @@ defmodule ExampleWeb.EagerLive do
 
     * **eager** — mounted by `mountStatic()` before the socket connects, so it
       paints immediately (with `liveStatus: "pending"`), then flips to `"ready"`
-      when the `KeenSvelte` hook fires `keen:live-ready`.
+      when the `KeenApp` hook fires `keen:live-ready`.
     * **default** — mounted the usual way, from the hook after the socket
       connects, so it only appears once `live` is available.
 
@@ -57,7 +57,7 @@ defmodule ExampleWeb.EagerLive do
             <h1 class="text-2xl font-bold tracking-tight">Mount before connect</h1>
           </div>
           <p class="mt-3 text-base-content/70">
-            On a LiveView, an island normally mounts from the <code>KeenSvelte</code>
+            On a LiveView, an island normally mounts from the <code>KeenApp</code>
             hook — which can't run until the socket connects. With
             <code>&lt;.app eager&gt;</code>
             the island is mounted by <code>mountStatic()</code>

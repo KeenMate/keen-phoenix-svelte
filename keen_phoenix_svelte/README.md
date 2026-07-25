@@ -46,7 +46,7 @@ Two cooperating halves:
 
 - **Elixir** — `<.app>` renders a hook-bound `<div>` (`phx-update="ignore"`,
   `data-app`, JSON `data-props`); `<KeenPhoenixSvelte.runtime>` emits the page context.
-- **JS** — the `KeenSvelte` hook mounts the island inside a LiveView and `AppsManager`
+- **JS** — the `KeenApp` hook mounts the island inside a LiveView and `AppsManager`
   lazily `import()`s `/apps/<name>/main.mjs` (or a registered URL); `mountStatic()`
   mounts islands on plain pages. Only the bundles on a page are fetched.
 
@@ -86,7 +86,7 @@ plus a channel) lives in the
 `keen_phoenix_svelte` is a **dual package**: the Hex library `keen_phoenix_svelte`
 and the npm package `@keenmate/phoenix_svelte` are released **in lockstep at the
 same version** — install matching versions of both. The Elixir side renders the
-component + hook wiring; the npm side supplies the client runtime (the `KeenSvelte`
+component + hook wiring; the npm side supplies the client runtime (the `KeenApp`
 hook, `AppsManager`, the `api`/`channel` helpers, and the Vite build helper).
 
 ## License

@@ -14,7 +14,7 @@ defmodule KeenPhoenixSvelteComponentTest do
     html =
       render_component(&KeenPhoenixSvelte.app/1, %{name: "like", id: "like-1", props: %{a: 1}})
 
-    assert html =~ ~s(phx-hook="KeenSvelte")
+    assert html =~ ~s(phx-hook="KeenApp")
     assert html =~ ~s(phx-update="ignore")
     assert html =~ ~s(data-app="like")
     assert html =~ ~s(data-props="{&quot;a&quot;:1}")

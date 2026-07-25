@@ -93,7 +93,7 @@ defmodule KeenPhoenixSvelte do
 
   ## Eager mounting
 
-  By default, on a LiveView page the island mounts from the `KeenSvelte` hook's
+  By default, on a LiveView page the island mounts from the `KeenApp` hook's
   `mounted()` — which cannot run until the socket connects and the view mounts.
   On a cold first load that connect round-trip is often the biggest slice of the
   delay between "bundle loaded" and "first paint".
@@ -190,7 +190,7 @@ defmodule KeenPhoenixSvelte do
       tag_name={@tag}
       id={@id}
       class={@class}
-      phx-hook="KeenSvelte"
+      phx-hook="KeenApp"
       phx-update="ignore"
       data-app={@name}
       data-props={Jason.encode!(@props)}

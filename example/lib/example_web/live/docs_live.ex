@@ -545,7 +545,7 @@ defmodule ExampleWeb.DocsLive do
           <p class="text-base-content/60 mt-1">
             On a LiveView the first HTTP response is a <strong>full server render</strong> — you
             see the page and the island's <em>placeholder</em>
-            right away. But the island's JS only mounts when the <code>KeenSvelte</code>
+            right away. But the island's JS only mounts when the <code>KeenApp</code>
             hook runs, and the hook can't run until the <strong>socket connects</strong>. On a
             cold load that connect is usually the biggest slice of the wait between placeholder
             and live island.

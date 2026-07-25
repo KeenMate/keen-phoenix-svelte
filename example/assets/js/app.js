@@ -43,7 +43,7 @@ window.addEventListener("phx:page-loading-stop", _info => topbar.hide())
 liveSocket.connect()
 
 // Mount Svelte apps on plain (non-LiveView) pages. Elements inside a LiveView
-// are skipped here and mounted by the KeenSvelte hook instead. app.js is a
+// are skipped here and mounted by the KeenApp hook instead. app.js is a
 // deferred script, so the DOM is already parsed.
 mountStatic()
 

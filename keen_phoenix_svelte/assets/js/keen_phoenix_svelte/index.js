@@ -25,15 +25,15 @@ export function mountStatic(root) {
 }
 
 /**
- * LiveView hook that mounts a compiled Svelte component into its element and
- * keeps it in sync with server-driven prop changes.
+ * LiveView hook that mounts a compiled island into its element and keeps it in
+ * sync with server-driven prop changes.
  *
  * Rendered by the `<.app>` function component; you only need to register it:
  *
  *   import { getHooks } from "@keenmate/phoenix_svelte"
  *   new LiveSocket("/live", Socket, { hooks: getHooks(), ... })
  */
-export const KeenSvelte = {
+export const KeenApp = {
   mounted() {
     const name = this.el.dataset.app;
 
@@ -174,7 +174,7 @@ function teardown(instance) {
 
 /** Convenience for `new LiveSocket(..., { hooks: getHooks() })`. */
 export function getHooks(extra = {}) {
-  return { KeenSvelte, ...extra };
+  return { KeenApp, ...extra };
 }
 
 export default getHooks;

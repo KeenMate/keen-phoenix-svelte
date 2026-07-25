@@ -59,7 +59,7 @@ Two cooperating halves:
 | Half | Responsibility |
 | --- | --- |
 | **Elixir** | `<.app>` renders a hook-bound `<div>` (`phx-update="ignore"`, `data-app`, JSON `data-props`); `<KeenPhoenixSvelte.runtime>` emits the page context. |
-| **JS** | The `KeenSvelte` hook mounts the island inside a LiveView; `AppsManager` lazily `import()`s `/apps/<name>/main.mjs` (or a registered URL); `mountStatic()` mounts islands on plain pages. Any framework's bundle mounts through the same contract. |
+| **JS** | The `KeenApp` hook mounts the island inside a LiveView; `AppsManager` lazily `import()`s `/apps/<name>/main.mjs` (or a registered URL); `mountStatic()` mounts islands on plain pages. Any framework's bundle mounts through the same contract. |
 
 Because LiveView owns the DOM, `phx-update="ignore"` keeps it out of the
 Svelte-owned subtree, and the hook drives mount / prop-update / teardown across

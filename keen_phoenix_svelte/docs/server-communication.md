@@ -75,7 +75,7 @@ end
 
 ### `liveStatus` and eager mounting
 
-Normally the island mounts from the `KeenSvelte` hook, which only runs after the
+Normally the island mounts from the `KeenApp` hook, which only runs after the
 LiveView socket connects — so `live` is present from the first frame
 (`liveStatus: "ready"`). With [`<.app eager>`](KeenPhoenixSvelte.html#app/1-eager-mounting)
 the island instead mounts *before* connect, to paint sooner. It then starts with

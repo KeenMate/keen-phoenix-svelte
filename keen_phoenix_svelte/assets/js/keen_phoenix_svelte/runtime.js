@@ -114,7 +114,7 @@ function parseProps(el) {
  *   * **Eager islands on a LiveView page** (`<.app eager>`, i.e. `data-eager`) —
  *     mounted here too, *before* the socket connects, so they paint without
  *     waiting for the hook. They start with `live: null` and `liveStatus:
- *     "pending"`; the `KeenSvelte` hook later upgrades them with the live bridge
+ *     "pending"`; the `KeenApp` hook later upgrades them with the live bridge
  *     (see index.js) and fires a `keen:live-ready` event.
  *
  * Non-eager LiveView islands are skipped — the hook mounts those once connected.

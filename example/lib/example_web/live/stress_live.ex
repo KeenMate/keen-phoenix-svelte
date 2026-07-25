@@ -9,7 +9,7 @@ defmodule ExampleWeb.StressLive do
     * **Mount at scale** — up to a full page of rows (100) mount at once off one
       shared, preloaded bundle; **paging tears down this page's islands and mounts
       the next**, so switching pages churns mount/teardown through `AppsManager`
-      + the `KeenSvelte` hook.
+      + the `KeenApp` hook.
     * **Server → island prop-sync at scale** — the amount `<input>` is
       **LiveView-owned** (HEEx, not the island). Each edit round-trips to the
       server, which recomputes the line `total`, re-renders that row, and the hook
@@ -183,7 +183,7 @@ defmodule ExampleWeb.StressLive do
             <code>mountStatic()</code>
             the instant <code>app.js</code>
             parses — before the socket connects — so they paint immediately; off, each waits for the
-            <code>KeenSvelte</code>
+            <code>KeenApp</code>
             hook after connect. The toggle reloads the page, since eager only applies to the initial
             paint (the qty inputs are LiveView-owned and stay interactive only after connect either
             way).
