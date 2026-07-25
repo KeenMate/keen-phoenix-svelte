@@ -1,10 +1,15 @@
 <script>
+  import { translator } from "./i18n.js";
+
   // Same {title, data} as the chart view — the two <.app> tags on the page pass
   // identical props, differing only by `component`. Renders the data as rows with
-  // each value's share of the total.
-  let { title = "Table", data = [] } = $props();
+  // each value's share of the total. `context` carries the page-wide locale; only
+  // the column headers (the island's own chrome) are translated — title/labels are
+  // server content.
+  let { title = "Table", data = [], context } = $props();
 
   const total = $derived(data.reduce((sum, d) => sum + d.value, 0) || 1);
+  const t = $derived(translator(context?.locale || "en"));
 </script>
 
 <div class="card">
@@ -15,7 +20,7 @@
 
   <table>
     <thead>
-      <tr><th>Label</th><th class="num">Value</th><th class="num">Share</th></tr>
+      <tr><th>{t("label")}</th><th class="num">{t("value")}</th><th class="num">{t("share")}</th></tr>
     </thead>
     <tbody>
       {#each data as d (d.label)}

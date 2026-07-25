@@ -1,10 +1,14 @@
 <script>
   import qrcode from "qrcode-generator";
+  import { translator } from "./i18n.js";
 
   // Everything the QR encodes arrives as props from the server. The amount lives
   // in a LiveView <input> (not here), so each edit round-trips to the server,
   // which recomputes `total` and pushes fresh props — this island just re-encodes.
-  let { code, title, unit_price, amount, total } = $props();
+  // `context` carries the page-wide locale; the island localizes its own chrome.
+  let { code, title, unit_price, amount, total, context } = $props();
+
+  const t = $derived(translator(context?.locale || "en"));
 
   // The scannable payload: the five fields, compactly. Recomputed whenever any
   // prop changes (i.e. whenever the server pushes a new amount/total).
@@ -36,18 +40,18 @@
   });
 </script>
 
-<button type="button" class="qr" onclick={() => (open = true)} aria-label={`Zoom QR for ${code}`}>
+<button type="button" class="qr" onclick={() => (open = true)} aria-label={t("zoomAria", code)}>
   <!-- eslint-disable-next-line svelte/no-at-html-tags -->
   {@html svg}
-  <span class="cap">tap to zoom · {code}</span>
+  <span class="cap">{t("tapToZoom")} · {code}</span>
 </button>
 
 {#if open}
-  <div class="qr-modal" role="dialog" aria-modal="true" aria-label={`QR for ${code}`}>
-    <button type="button" class="qr-backdrop" aria-label="Close" onclick={() => (open = false)}
+  <div class="qr-modal" role="dialog" aria-modal="true" aria-label={t("dialogAria", code)}>
+    <button type="button" class="qr-backdrop" aria-label={t("close")} onclick={() => (open = false)}
     ></button>
     <div class="qr-card">
-      <button type="button" class="x" onclick={() => (open = false)} aria-label="Close">×</button>
+      <button type="button" class="x" onclick={() => (open = false)} aria-label={t("close")}>×</button>
 
       <div class="big">
         <!-- eslint-disable-next-line svelte/no-at-html-tags -->
@@ -58,9 +62,9 @@
         <div class="title">{title}</div>
         <div class="code">{code}</div>
         <dl>
-          <div><dt>Unit</dt><dd>{money(unit_price)}</dd></div>
-          <div><dt>Qty</dt><dd>{amount}</dd></div>
-          <div class="tot"><dt>Total</dt><dd>{money(total)}</dd></div>
+          <div><dt>{t("unit")}</dt><dd>{money(unit_price)}</dd></div>
+          <div><dt>{t("qty")}</dt><dd>{amount}</dd></div>
+          <div class="tot"><dt>{t("total")}</dt><dd>{money(total)}</dd></div>
         </dl>
       </div>
     </div>
