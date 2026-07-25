@@ -19,8 +19,12 @@
   // Clicking an avatar asks the *host LiveView* to open that person's profile in
   // the page's right column. The island owns realtime over its channel, but this
   // one action is delegated to LiveView to show the two coexisting: Svelte fires
-  // an event, server-rendered chrome next to the island reacts.
-  const openProfile = live ? (userId) => live.pushEvent("show_profile", { user_id: userId }) : null;
+  // an event, server-rendered chrome next to the island reacts. Derived (not a
+  // one-off read) so it stays correct if `live` arrives after mount — e.g. an
+  // eager mount that starts with `live: null` and is upgraded on connect.
+  const openProfile = $derived(
+    live ? (userId) => live.pushEvent("show_profile", { user_id: userId }) : null,
+  );
 
   // Initial room only — the user drives it after mount, so we read the prop once
   // via untrack() rather than tracking it (which Svelte would warn about).

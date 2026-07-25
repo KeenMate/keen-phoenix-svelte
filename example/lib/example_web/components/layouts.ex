@@ -152,6 +152,18 @@ defmodule ExampleWeb.Layouts do
                   label={I18n.t(@locale, "nav.eager")}
                 />
                 <.nav_item
+                  navigate={~p"/stress"}
+                  active={@active == :stress}
+                  icon="hero-qr-code"
+                  label={I18n.t(@locale, "nav.stress")}
+                />
+                <.nav_item
+                  navigate={~p"/widgets"}
+                  active={@active == :widgets}
+                  icon="hero-squares-2x2"
+                  label={I18n.t(@locale, "nav.widgets")}
+                />
+                <.nav_item
                   navigate={~p"/docs"}
                   active={@active == :docs}
                   icon="hero-book-open"
@@ -205,6 +217,8 @@ defmodule ExampleWeb.Layouts do
        do: I18n.t(locale, "nav.#{active}")
 
   defp header_title(locale, :eager, _title), do: I18n.t(locale, "nav.eager")
+  defp header_title(locale, :stress, _title), do: I18n.t(locale, "nav.stress")
+  defp header_title(locale, :widgets, _title), do: I18n.t(locale, "nav.widgets")
 
   defp header_title(_locale, _active, title), do: title || ""
 

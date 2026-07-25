@@ -56,12 +56,40 @@ defmodule KeenPhoenixSvelte do
       `KeenPhoenixSvelte.Apps`).
     * `id` (required) - unique, stable DOM id (LiveView hooks require it).
     * `props` - a map passed to the app. Defaults to `%{}`.
+    * `component` - selects which view a multi-component app renders. Pure sugar
+      for a `component` key in `props` (see below). Defaults to `nil` (unset).
     * `class` - optional class list on the wrapper div.
     * `tag` - wrapper element, defaults to `"div"`.
     * `eager` - mount **before** the LiveView socket connects. Defaults to `false`.
 
   Any other attribute (e.g. `data-*`, `style`) is forwarded to the wrapper via
   the `:global` attribute.
+
+  ## Selecting a component (multi-component apps)
+
+  Independent apps each bundle their own framework runtime. When several views
+  belong together, ship them as **one** app (one bundle, one shared runtime) and
+  let each `<.app>` pick a view with `component`:
+
+      <.app name="widgets" id="w-chart" component="chart" props={%{series: @series}} />
+      <.app name="widgets" id="w-table" component="table" props={%{rows: @rows}} />
+
+  Both mount from the single `widgets` bundle — imported once, mounted twice — so
+  the runtime is paid once no matter how many views the page shows.
+
+  `component` is **exactly** sugar for a `component` entry in `props`: the two
+  calls below are identical. It wins over a `:component` key already in `props`.
+
+      <.app name="widgets" id="w" component="table" props={%{rows: @rows}} />
+      <.app name="widgets" id="w" props={%{component: "table", rows: @rows}} />
+
+  The island's entry reads `props.component` and mounts the matching view:
+
+      const VIEWS = { chart: Chart, table: Table };
+      export default (target, { props, ...rest }) => {
+        const Comp = VIEWS[props.component] ?? Chart;
+        // ...mount Comp...
+      };
 
   ## Eager mounting
 
@@ -117,6 +145,11 @@ defmodule KeenPhoenixSvelte do
   attr :name, :string, required: true
   attr :id, :string, required: true
   attr :props, :map, default: %{}
+
+  attr :component, :string,
+    default: nil,
+    doc: "Selects a view in a multi-component app; sugar for a `component` key in `props`."
+
   attr :class, :any, default: nil
   attr :tag, :string, default: "div"
   attr :eager, :boolean, default: false
@@ -148,6 +181,9 @@ defmodule KeenPhoenixSvelte do
         if(placeholder == [], do: resolve_placeholder(assigns.name))
       )
       |> assign(:placeholder, placeholder)
+      # `component` is sugar for a `component` prop; fold it in (attr wins) so the
+      # island reads it via `props.component` with no client-side change.
+      |> assign(:props, merge_component(assigns.props, assigns.component))
 
     ~H"""
     <.dynamic_tag
@@ -171,6 +207,11 @@ defmodule KeenPhoenixSvelte do
     </.dynamic_tag>
     """
   end
+
+  # `<.app component="…">` is sugar for a `component` prop. Merge it last so the
+  # attribute overrides any `:component` already present in `props`.
+  defp merge_component(props, nil), do: props
+  defp merge_component(props, component), do: Map.put(props, :component, component)
 
   # The built-in loader: a neutral skeleton block that fills the container with a
   # gentle opacity pulse. Inline styles + `currentColor` so it renders identically

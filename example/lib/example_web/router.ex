@@ -44,6 +44,8 @@ defmodule ExampleWeb.Router do
       live "/calendar", CalendarLive, :index
       live "/proxying", ProxyingLive, :index
       live "/eager", EagerLive, :index
+      live "/stress", StressLive, :index
+      live "/widgets", WidgetsLive, :index
       live "/docs", DocsLive, :index
     end
 

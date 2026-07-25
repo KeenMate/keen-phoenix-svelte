@@ -1,6 +1,6 @@
 {
   "name": "@keenmate/phoenix_svelte",
-  "version": "1.0.0-rc06",
+  "version": "1.0.0-rc07",
   "description": "Auto-mount compiled Svelte (React, Lit, …) apps into Phoenix (hook + AppsManager).",
   "type": "module",
   "main": "assets/js/keen_phoenix_svelte/index.js",

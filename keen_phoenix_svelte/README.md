@@ -30,18 +30,15 @@ Lit, React and vanilla-JS islands through it.
 > **[Philosophy & comparison](docs/philosophy.md)** — the autonomous-island model,
 > what this deliberately doesn't do, and how it differs from `live_svelte`.
 
+## What's New in v1.0.0-rc.7
+
+- **Pick a view with `<.app component="…">`** — a first-class attribute for multi-component islands, desugaring to a `component` prop (it wins over one already in `props`). Keep related views (say a chart and a table) in one app so they share a single imported runtime, and select between them per `<.app>` — instead of separate apps that each inline their own copy of the framework.
+
 ## What's New in v1.0.0-rc.6
 
 - **Eager mounting — paint before the socket connects** — `<.app eager>` mounts an island the instant `app.js` parses instead of waiting for the LiveView hook, collapsing the cold-load gap between the server-rendered placeholder and the live island. It starts without `live` and is upgraded once the socket connects — ideal for islands that draw from `api`, a `channel`, or another server. A no-op on plain pages.
 - **`liveStatus` on the boundary** — every island now knows whether `live` is here (`"ready"`), coming (`"pending"`, an eager mount), or never present (`"none"`, a plain page) — enough to show a loader while waiting and choose the right transport.
 - **`keen:live-ready`** — a `CustomEvent` (with `detail.live`), plus an optional `setLive(live)` handle method, fired when an eagerly-mounted island's `live` bridge arrives. Server-pushed prop updates keep flowing the whole time; only imperative `live.*` calls need the bridge.
-
-## What's New in v1.0.0-rc.5
-
-- **Automatic, page-scoped preloading — on by default** — `<KeenPhoenixSvelte.runtime>` now defaults to `preload={:auto}`: each `<.app>` records itself as it renders and the runtime emits `<link rel="modulepreload">` for exactly the islands on that page, so bundles download during initial HTML parse with no per-page list to maintain. A page with no islands preloads nothing; opt out with `preload={false}` or override with an explicit list.
-- **Vite helper build fix — the documented published install works** — `@keenmate/phoenix_svelte/vite` no longer imports the undeclared `svelte-preprocess` (which failed with `Cannot find package`); it uses `vitePreprocess` from the Svelte plugin you already depend on, so `appConfig` builds with just the documented dependencies.
-- **One fewer attribute — `<.app framework="…">` removed** — it only emitted a `data-framework` tag the runtime never read, so it was API surface for no behavior. Drop it; a bundle already *is* whatever framework it is.
-- **Install docs — production build wiring (no more missing bundles)** — `installation.md` now documents the npm `scripts` and `mix` alias wiring (`assets.setup`/`build`/`deploy`) that builds islands for `mix setup` and releases — previously `mix assets.deploy` shipped none. Plus a clearer app.js edit (which lines you add vs. Phoenix's generated ones) and a note that `static_paths` `apps` is only needed for local apps.
 
 ## How it works
 

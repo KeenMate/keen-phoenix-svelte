@@ -5,6 +5,17 @@ All notable changes to `keen_phoenix_svelte` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0-rc.7] - 2026-07-25 [PUBLISHED]
+
+### Added
+
+- **`<.app component="…">`** — a first-class attribute for selecting which view a
+  multi-component island renders. Pure sugar for a `component` key in `props` (and
+  it overrides one already there), so the client reads `props.component` with no
+  change to the mount contract. Ship several related views in one app — one bundle,
+  one shared framework runtime, imported once and mounted per view — instead of
+  separate apps that each inline their own runtime copy.
+
 ## [1.0.0-rc.6] - 2026-07-24 [PUBLISHED]
 
 ### Added
@@ -367,6 +378,7 @@ islands, on both LiveView and plain controller-rendered pages.
 - External-service token delivery (a server-minted token for a *different*
   service in `context.tokens.*`) — planned, not yet implemented.
 
+[1.0.0-rc.7]: https://github.com/KeenMate/keen-phoenix-svelte/releases/tag/v1.0.0-rc.7
 [1.0.0-rc.6]: https://github.com/KeenMate/keen-phoenix-svelte/releases/tag/v1.0.0-rc.6
 [1.0.0-rc.5]: https://github.com/KeenMate/keen-phoenix-svelte/releases/tag/v1.0.0-rc.5
 [1.0.0-rc.4]: https://github.com/KeenMate/keen-phoenix-svelte/releases/tag/v1.0.0-rc.4
