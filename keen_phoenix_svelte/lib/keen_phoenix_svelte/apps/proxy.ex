@@ -34,12 +34,15 @@ defmodule KeenPhoenixSvelte.Apps.Proxy do
   falls back to a `:ttl` (default 5 min) otherwise — so **unversioned** upstreams
   (`cdn/app.js`) are re-checked on a cadence instead of being pinned forever. See
   `KeenPhoenixSvelte.Apps` for the `:proxy_cache` config and per-app `ttl` /
-  `immutable` overrides.
+  `immutable` / `client_cache_control` overrides.
 
   On the way out this plug forwards an `ETag` and a revalidate-friendly
-  `Cache-Control` (configurable; `immutable` per app), and answers the browser's
-  own `If-None-Match` with a `304` — completing a browser → Phoenix → origin
-  conditional-request chain.
+  `Cache-Control`, and answers the browser's own `If-None-Match` with a `304` —
+  completing a browser → Phoenix → origin conditional-request chain. The
+  `Cache-Control` value is resolved most-specific-first: a per-app
+  `client_cache_control:` string, else a per-app `immutable: true` (whose value is
+  the global `immutable_cache_control`, defaulting to a 1-year immutable string),
+  else the global `client_cache_control`, else the built-in default.
 
   ## Fetching
 
@@ -78,8 +81,12 @@ defmodule KeenPhoenixSvelte.Apps.Proxy do
       nil ->
         conn |> send_resp(404, "unknown app") |> halt()
 
-      {name, url, _sub} ->
-        serve(conn, name, url)
+      {name, url, sub} ->
+        if allowed_file?(name, sub) do
+          serve(conn, name, url)
+        else
+          conn |> send_resp(404, "unknown app file") |> halt()
+        end
     end
   end
 
@@ -90,11 +97,55 @@ defmodule KeenPhoenixSvelte.Apps.Proxy do
       {:ok, entry} ->
         respond(conn, entry, opts, url)
 
+      {:error, :overloaded} ->
+        # At the concurrency ceiling — shed load rather than pile on more outbound
+        # fetches. Retryable, so nudge the client to come back.
+        conn |> put_resp_header("retry-after", "1") |> send_resp(503, "app proxy busy") |> halt()
+
       {:error, reason} ->
         Logger.error("[keen_phoenix_svelte] app proxy failed for #{url}: #{inspect(reason)}")
         conn |> send_resp(502, "app upstream error") |> halt()
     end
   end
+
+  # A base/dir app may declare a `manifest` — the set of files it actually ships.
+  # When present, a sub-path not in it is rejected HERE, before any upstream fetch,
+  # closing the unbounded sub-path fan-out. Absent → allow (negative-caching + the
+  # concurrency cap still bound abuse). The bare entry hit (`sub == ""`) is always
+  # allowed. A manifest that can't be loaded fails open (still bounded downstream).
+  defp allowed_file?(_name, ""), do: true
+
+  defp allowed_file?(name, sub) do
+    case Apps.registered()[name] do
+      %{manifest: m} = spec when not is_nil(m) -> manifest_allows?(name, spec, m, sub)
+      _ -> true
+    end
+  end
+
+  defp manifest_allows?(_name, spec, manifest, sub) when is_list(manifest),
+    do: sub == entry_of(spec) or normalize_sub(sub) in Enum.map(manifest, &normalize_sub/1)
+
+  defp manifest_allows?(name, spec, manifest, sub) when is_binary(manifest) do
+    cond do
+      sub == manifest -> true
+      sub == entry_of(spec) -> true
+      true -> manifest_file_allows?(name, manifest, sub)
+    end
+  end
+
+  defp manifest_file_allows?(name, manifest, sub) do
+    with {_, murl, _} <- Apps.resolve([name | String.split(manifest, "/")]),
+         {:ok, set} <- ProxyCache.manifest_set(murl, Apps.proxy_opts(name)) do
+      MapSet.member?(set, normalize_sub(sub))
+    else
+      _ -> true
+    end
+  end
+
+  defp normalize_sub(path), do: path |> String.trim_leading("./") |> String.trim_leading("/")
+
+  defp entry_of(%{entry: e}) when is_binary(e), do: e
+  defp entry_of(_), do: "main.mjs"
 
   defp respond(conn, entry, opts, url) do
     conn = put_validators(conn, entry, opts)
@@ -129,6 +180,10 @@ defmodule KeenPhoenixSvelte.Apps.Proxy do
 
   defp put_validators(conn, entry, opts) do
     conn
+    # We set an explicit Content-Type per file (see `content_type/1`); `nosniff`
+    # stops a browser from MIME-sniffing the body into something else — an asset
+    # served under our origin must be typed by us, not guessed.
+    |> put_resp_header("x-content-type-options", "nosniff")
     |> put_resp_header("cache-control", client_cache_control(opts))
     |> maybe_put_etag(entry.etag)
   end
@@ -136,8 +191,15 @@ defmodule KeenPhoenixSvelte.Apps.Proxy do
   defp maybe_put_etag(conn, nil), do: conn
   defp maybe_put_etag(conn, etag), do: put_resp_header(conn, "etag", etag)
 
-  defp client_cache_control(%{immutable: true}), do: @immutable
+  # Precedence, most specific first: a per-app `client_cache_control:` string wins
+  # over everything; then a per-app `immutable: true` (its value is the global
+  # `immutable_cache_control` override, else the built-in 1-year immutable string);
+  # then the global `client_cache_control`; then the built-in default.
   defp client_cache_control(%{client_cache_control: cc}) when is_binary(cc), do: cc
+  defp client_cache_control(%{immutable: true} = opts),
+    do: opts[:immutable_cache_control] || @immutable
+
+  defp client_cache_control(%{global_cache_control: cc}) when is_binary(cc), do: cc
   defp client_cache_control(_opts), do: @default_client_cc
 
   defp browser_current?(_conn, %{etag: nil}), do: false

@@ -43,18 +43,44 @@ defmodule KeenPhoenixSvelte.Apps do
         proxy_cache: [
           ttl: :timer.minutes(5),   # freshness fallback when the origin sends no cache directives
           respect_upstream: true,   # honor upstream Cache-Control / ETag / Last-Modified
-          client_cache_control: "public, max-age=60, stale-while-revalidate=300"
+          # the browser-facing Cache-Control for a normal (non-immutable) bundle…
+          client_cache_control: "public, max-age=60, stale-while-revalidate=300",
+          # …and the one emitted for a per-app `immutable: true` bundle (defaults to
+          # "public, max-age=31536000, immutable" if unset).
+          immutable_cache_control: "public, max-age=31536000, immutable",
+          # abuse bounds for base/dir apps: cap concurrent upstream fetches, and
+          # briefly remember an upstream "not found" so a flood of guaranteed-miss
+          # sub-paths isn't re-fetched every request (set to 0 to disable).
+          max_concurrent_fetches: 32,
+          negative_ttl: :timer.seconds(10),
+          # how often orphaned URLs (no longer in the registry) are swept from the
+          # cache; `false` disables the sweep.
+          sweep_interval: :timer.hours(1),
+          # TLS options for the built-in :httpc fetcher. Defaults to verifying the
+          # origin cert against the system trust store (`verify: :verify_peer` +
+          # hostname check); override to pass a custom CA bundle or relax/tighten.
+          ssl_options: [verify: :verify_peer]
         ],
         apps: %{
           # a plain URL uses the global load_mode:
           "org-chart" => "https://cdn.acme.com/islands/org-chart@1.4.2/main.mjs",
-          # or override per app (per-app `ttl`/`immutable` tune the proxy cache):
+          # or override per app (per-app `ttl`/`immutable`/`client_cache_control`
+          # tune the proxy cache; a per-app `client_cache_control:` string wins over
+          # everything):
           "report" => %{url: "https://reports.internal/report/main.mjs", mode: :direct},
           "pinned" => %{url: "https://cdn.acme.com/pinned@2.0.0/main.mjs", immutable: true},
+          "hourly" => %{url: "https://cdn.acme.com/hourly/main.mjs", client_cache_control: "public, max-age=3600"},
           # a multi-file bundle (JS + CSS + assets) — give a `base:` directory and
           # (optionally) the `entry:` the client imports (defaults to "main.mjs").
           # Any sub-path is proxied: `/apps/player/player.css` → `<base>/player.css`.
-          "player" => %{base: "https://cdn.acme.com/player@3/", entry: "player.mjs"},
+          # A `manifest:` (inline list, or a bundle file path to a JSON/text list)
+          # restricts serving to exactly the files it names — any other sub-path is
+          # a 404 with no upstream fetch.
+          "player" => %{
+            base: "https://cdn.acme.com/player@3/",
+            entry: "player.mjs",
+            manifest: "manifest.json"
+          },
           # a LOCAL directory on disk (e.g. a mounted volume another process writes
           # to). `entry:` is a glob; the newest match wins, so a content-hashed
           # bundle (`bundle.a1b2c3.js`) resolves without knowing the hash. Served
@@ -80,7 +106,7 @@ defmodule KeenPhoenixSvelte.Apps do
   @spec base_path() :: String.t()
   def base_path, do: get(:base_path, "/apps")
 
-  @doc "The registered apps, normalized to `%{name => %{url, mode, ttl, immutable}}`."
+  @doc "The registered apps, normalized to `%{name => %{url, mode, ttl, immutable, client_cache_control}}`."
   @spec registered() :: %{optional(String.t()) => map()}
   def registered do
     :keen_phoenix_svelte
@@ -201,7 +227,20 @@ defmodule KeenPhoenixSvelte.Apps do
 
   defp local_source(name, %{dir: dir}, rest) do
     sub = Enum.join(rest, "/")
-    {name, "file:" <> Path.join(dir, sub), sub}
+    path = Path.join(dir, sub)
+    if within_dir?(path, dir), do: {name, "file:" <> path, sub}, else: nil
+  end
+
+  # Defense in depth: `safe_subpath?/1` already strips `..`/backslash/empty
+  # segments, but assert the resolved file truly sits under the app's `:dir` before
+  # handing it to the reader. This also blocks a symlink or a Windows drive-relative
+  # segment (`C:foo`) that would resolve outside the tree — off-tree → no match
+  # (404), never a read. Both sides are expanded and separator-normalized so the
+  # prefix compare is sound on Windows too.
+  defp within_dir?(path, dir) do
+    root = dir |> Path.expand() |> String.replace("\\", "/")
+    full = path |> Path.expand() |> String.replace("\\", "/")
+    full == root or String.starts_with?(full, root <> "/")
   end
 
   @doc """
@@ -213,6 +252,8 @@ defmodule KeenPhoenixSvelte.Apps do
           respect_upstream: boolean(),
           immutable: boolean(),
           client_cache_control: String.t() | nil,
+          global_cache_control: String.t() | nil,
+          immutable_cache_control: String.t() | nil,
           freshness: (map() -> non_neg_integer()) | nil
         }
   def proxy_opts(name) do
@@ -223,7 +264,11 @@ defmodule KeenPhoenixSvelte.Apps do
       ttl_ms: spec[:ttl] || cfg[:ttl] || :timer.minutes(5),
       respect_upstream: Keyword.get(cfg, :respect_upstream, true),
       immutable: spec[:immutable] || false,
-      client_cache_control: cfg[:client_cache_control],
+      # per-app override (highest precedence), the global default, and the string
+      # emitted for `immutable: true` — resolved into one header by `Apps.Proxy`.
+      client_cache_control: spec[:client_cache_control],
+      global_cache_control: cfg[:client_cache_control],
+      immutable_cache_control: cfg[:immutable_cache_control],
       freshness: cfg[:freshness]
     }
   end
@@ -288,7 +333,17 @@ defmodule KeenPhoenixSvelte.Apps do
   end
 
   defp normalize(url) when is_binary(url),
-    do: %{url: url, base: nil, dir: nil, entry: nil, mode: load_mode(), ttl: nil, immutable: false}
+    do: %{
+      url: url,
+      base: nil,
+      dir: nil,
+      entry: nil,
+      mode: load_mode(),
+      ttl: nil,
+      immutable: false,
+      client_cache_control: nil,
+      manifest: nil
+    }
 
   defp normalize(%{} = spec) do
     %{
@@ -298,7 +353,11 @@ defmodule KeenPhoenixSvelte.Apps do
       entry: spec[:entry] || spec["entry"],
       mode: spec[:mode] || spec["mode"] || load_mode(),
       ttl: spec[:ttl] || spec["ttl"],
-      immutable: spec[:immutable] || spec["immutable"] || false
+      immutable: spec[:immutable] || spec["immutable"] || false,
+      client_cache_control: spec[:client_cache_control] || spec["client_cache_control"],
+      # a servable-file allowlist: an inline list, or a bundle sub-path to a
+      # `.json`/text manifest (fetched + cached like any file). See `Apps.Proxy`.
+      manifest: spec[:manifest] || spec["manifest"]
     }
   end
 

@@ -28,6 +28,17 @@ defmodule KeenPhoenixSvelte.Apps.ProxyCache do
   (`cdn/app.js` with no version in the path): they can't be cache-busted by URL,
   so the proxy polls/revalidates them on the `:ttl` cadence instead.
 
+  ## Fetching & TLS
+
+  The built-in fetcher is Erlang's `:httpc`. Because its bytes end up running
+  same-origin in users' browsers, the fetch leg is locked down: TLS certificates
+  are **verified** against the system trust store (`verify: :verify_peer` with
+  hostname checking) and upstream **redirects are not followed**
+  (`autoredirect: false`, closing an SSRF path where a 30x could point the fetch
+  at an internal address). Override the TLS options with `:proxy_cache`
+  `:ssl_options` (e.g. a custom CA bundle), or replace the client entirely — and
+  its policy — via the `:app_provider` hook (see `KeenPhoenixSvelte.Apps.Proxy`).
+
   ## Memory
 
   Entries are keyed by upstream URL, so a refresh **upserts** in place — the table
@@ -43,22 +54,41 @@ defmodule KeenPhoenixSvelte.Apps.ProxyCache do
   alias KeenPhoenixSvelte.Apps
 
   @type entry :: %{
-          body: binary(),
+          body: binary() | nil,
           etag: String.t() | nil,
           last_modified: String.t() | nil,
           cache_control: String.t() | nil,
           fetched_at: integer(),
-          fresh_for: non_neg_integer()
+          fresh_for: non_neg_integer(),
+          # present only on a *tombstone* — a briefly-cached upstream "not found",
+          # so a flood of guaranteed-miss sub-paths isn't re-fetched every request.
+          negative: term()
         }
 
   @call_timeout 15_000
   @task_supervisor KeenPhoenixSvelte.Apps.ProxyTaskSupervisor
   @table __MODULE__
+  @manifest_table Module.concat(__MODULE__, Manifests)
   @default_sweep_interval :timer.hours(1)
+  @default_max_fetches 32
+  @default_negative_ttl :timer.seconds(10)
 
   # ── public API ────────────────────────────────────────────────────────────
 
   def start_link(opts), do: GenServer.start_link(__MODULE__, opts, name: __MODULE__)
+
+  @doc """
+  Ceiling on concurrent in-flight upstream fetches (`:proxy_cache`
+  `:max_concurrent_fetches`, default #{@default_max_fetches}). Read at boot by the
+  `Task.Supervisor` and per-refresh by the GenServer.
+  """
+  @spec max_concurrent_fetches() :: pos_integer()
+  def max_concurrent_fetches do
+    case cfg()[:max_concurrent_fetches] do
+      n when is_integer(n) and n > 0 -> n
+      _ -> @default_max_fetches
+    end
+  end
 
   @doc """
   Return a cache entry for `url`, fetching or revalidating upstream if the cached
@@ -69,12 +99,36 @@ defmodule KeenPhoenixSvelte.Apps.ProxyCache do
   def get(url, opts) do
     case lookup(url) do
       {:ok, entry} ->
-        if fresh?(entry), do: {:ok, entry}, else: refresh(url, opts, entry)
+        if fresh?(entry), do: from_entry(entry), else: refresh(url, opts, entry)
 
       :miss ->
         refresh(url, opts, nil)
     end
   end
+
+  @doc """
+  The set of file paths an app's `manifest` lists (its servable allowlist), fetched
+  and cached like any bundle and parsed once per content change. `url` is the
+  resolved manifest source, `opts` the app's `Apps.proxy_opts/1`.
+  """
+  @spec manifest_set(String.t(), map()) :: {:ok, MapSet.t(String.t())} | {:error, term()}
+  def manifest_set(url, opts) do
+    with {:ok, entry} <- get(url, opts) do
+      case :ets.lookup(@manifest_table, url) do
+        [{^url, {etag, set}}] when not is_nil(etag) and etag == entry.etag ->
+          {:ok, set}
+
+        _ ->
+          set = parse_manifest(url, entry.body)
+          :ets.insert(@manifest_table, {url, {entry.etag, set}})
+          {:ok, set}
+      end
+    end
+  end
+
+  # A tombstone (negative cache) surfaces as the original error, never as a body.
+  defp from_entry(%{negative: reason}), do: {:error, reason}
+  defp from_entry(entry), do: {:ok, entry}
 
   @doc false
   @spec lookup(String.t()) :: {:ok, entry()} | :miss
@@ -98,7 +152,8 @@ defmodule KeenPhoenixSvelte.Apps.ProxyCache do
             "(#{inspect(reason)}); serving stale copy"
         )
 
-        {:ok, stale}
+        # A stale *tombstone* re-surfaces as its error, not an empty 200.
+        from_entry(stale)
 
       {:error, _} = err ->
         err
@@ -115,6 +170,8 @@ defmodule KeenPhoenixSvelte.Apps.ProxyCache do
     # :public so the fetch task can write and plug processes can read directly
     # (concurrent reads never route through this process).
     :ets.new(@table, [:named_table, :public, :set, read_concurrency: true])
+    # Parsed manifest allowlists, keyed by manifest source URL → {etag, MapSet}.
+    :ets.new(@manifest_table, [:named_table, :public, :set, read_concurrency: true])
     schedule_sweep()
     {:ok, %{waiters: %{}, refs: %{}}}
   end
@@ -125,11 +182,19 @@ defmodule KeenPhoenixSvelte.Apps.ProxyCache do
     case lookup(url) do
       {:ok, entry} ->
         if fresh?(entry),
-          do: {:reply, {:ok, entry}, state},
-          else: {:noreply, enqueue(state, url, opts, from)}
+          do: {:reply, from_entry(entry), state},
+          else: dispatch(state, url, opts, from)
 
       :miss ->
-        {:noreply, enqueue(state, url, opts, from)}
+        dispatch(state, url, opts, from)
+    end
+  end
+
+  # Start a fetch, or reject when already at the concurrency ceiling.
+  defp dispatch(state, url, opts, from) do
+    case enqueue(state, url, opts, from) do
+      {:ok, state} -> {:noreply, state}
+      {:overloaded, state} -> {:reply, {:error, :overloaded}, state}
     end
   end
 
@@ -164,8 +229,12 @@ defmodule KeenPhoenixSvelte.Apps.ProxyCache do
   # from disk is cheap, so there's nothing to reclaim by evicting them.
   defp sweep(keep) do
     :ets.foldl(
-      fn {url, _entry}, _acc ->
-        if evictable?(url, keep), do: :ets.delete(@table, url)
+      fn {url, entry}, _acc ->
+        if evictable?(url, entry, keep) do
+          :ets.delete(@table, url)
+          :ets.delete(@manifest_table, url)
+        end
+
         nil
       end,
       nil,
@@ -173,9 +242,12 @@ defmodule KeenPhoenixSvelte.Apps.ProxyCache do
     )
   end
 
-  defp evictable?("file-glob:" <> _, _keep), do: false
-  defp evictable?("file:" <> _, _keep), do: false
-  defp evictable?(url, keep), do: not MapSet.member?(keep, url)
+  # An expired tombstone is always reclaimable (this is what bounds `file:` negative
+  # entries, whose keys are dynamic and so never appear in the registered set).
+  defp evictable?(_url, %{negative: _} = entry, _keep), do: not fresh?(entry)
+  defp evictable?("file-glob:" <> _, _entry, _keep), do: false
+  defp evictable?("file:" <> _, _entry, _keep), do: false
+  defp evictable?(url, _entry, keep), do: not MapSet.member?(keep, url)
 
   defp registered_urls do
     Apps.registered() |> Map.values() |> MapSet.new(& &1.url)
@@ -190,20 +262,29 @@ defmodule KeenPhoenixSvelte.Apps.ProxyCache do
     end
   end
 
-  # Add `from` to the waiter list for `url`; start a fetch task only if one is not
-  # already in flight (presence in `waiters` is the in-flight flag).
+  # Add `from` to the waiter list for `url`. If a fetch for this URL is already in
+  # flight, just attach (single-flight). Otherwise start one — unless we're already
+  # at the concurrency ceiling, in which case reject so the caller serves stale or
+  # 503 instead of spawning an unbounded task. Spawns are serialized through this
+  # process and refs tracked precisely, so `map_size(refs)` is an exact in-flight
+  # count and never races the `Task.Supervisor`'s own `max_children`.
   defp enqueue(state, url, opts, from) do
-    in_flight? = Map.has_key?(state.waiters, url)
-    waiters = Map.update(state.waiters, url, [from], &[from | &1])
-    state = %{state | waiters: waiters}
+    cond do
+      Map.has_key?(state.waiters, url) ->
+        {:ok, %{state | waiters: Map.update!(state.waiters, url, &[from | &1])}}
 
-    if in_flight? do
-      state
-    else
-      task =
-        Task.Supervisor.async_nolink(@task_supervisor, fn -> do_fetch(url, opts) end)
+      map_size(state.refs) >= max_concurrent_fetches() ->
+        {:overloaded, state}
 
-      %{state | refs: Map.put(state.refs, task.ref, url)}
+      true ->
+        task = Task.Supervisor.async_nolink(@task_supervisor, fn -> do_fetch(url, opts) end)
+
+        {:ok,
+         %{
+           state
+           | waiters: Map.put(state.waiters, url, [from]),
+             refs: Map.put(state.refs, task.ref, url)
+         }}
     end
   end
 
@@ -233,8 +314,11 @@ defmodule KeenPhoenixSvelte.Apps.ProxyCache do
         # 304 with nothing cached — shouldn't happen; treat as an error.
         {:error, :not_modified_without_cache}
 
-      {:error, _} = err ->
-        err
+      {:error, reason} ->
+        # Briefly remember a *definitive* not-found so a flood of guaranteed-miss
+        # sub-paths isn't re-fetched every request. Transient errors (timeout, 5xx,
+        # DNS) are NOT cached — they stay retryable and fail-open on stale.
+        if negative_cacheable?(reason), do: store_negative(url, reason), else: {:error, reason}
     end
   end
 
@@ -242,6 +326,39 @@ defmodule KeenPhoenixSvelte.Apps.ProxyCache do
     :ets.insert(@table, {url, entry})
     {:ok, entry}
   end
+
+  # Cache the miss as a short-lived tombstone (skipped entirely when the negative
+  # TTL is 0), returning the original error either way.
+  defp store_negative(url, reason) do
+    case negative_ttl() do
+      0 ->
+        {:error, reason}
+
+      ttl ->
+        :ets.insert(
+          @table,
+          {url,
+           %{
+             negative: reason,
+             body: nil,
+             etag: nil,
+             last_modified: nil,
+             cache_control: nil,
+             fetched_at: now(),
+             fresh_for: ttl
+           }}
+        )
+
+        {:error, reason}
+    end
+  end
+
+  # A 404/410 (URL) or a missing local file/glob is "this file doesn't exist" —
+  # safe to remember briefly. Everything else is transient and stays uncached.
+  defp negative_cacheable?({:status, s}), do: s in [404, 410]
+  defp negative_cacheable?({:enoent, _}), do: true
+  defp negative_cacheable?({:no_match, _}), do: true
+  defp negative_cacheable?(_), do: false
 
   defp build_entry(resp, opts) do
     body = resp.body
@@ -388,7 +505,15 @@ defmodule KeenPhoenixSvelte.Apps.ProxyCache do
       |> maybe_header(~c"if-modified-since", validators[:last_modified])
 
     request = {String.to_charlist(url), headers}
-    http_opts = [autoredirect: true, timeout: 10_000, connect_timeout: 5_000]
+
+    # `autoredirect: false` — a server-side fetcher must not follow upstream 30x
+    # blindly: a redirect to `169.254.169.254`/`localhost`/an internal host would
+    # be fetched and then served same-origin (SSRF). A 30x surfaces as
+    # `{:error, {:status, 3xx}}` and, if a stale copy exists, is served fail-open.
+    # `ssl:` pins TLS verification on (httpc does NOT verify certs by default), so
+    # the Phoenix→origin leg — whose bytes we execute in users' browsers — can't be
+    # MITM'd. Callers needing a redirect-following or custom client use `:app_provider`.
+    http_opts = [autoredirect: false, timeout: 10_000, connect_timeout: 5_000, ssl: ssl_opts()]
 
     case :httpc.request(:get, request, http_opts, body_format: :binary) do
       {:ok, {{_v, 200, _r}, resp_headers, body}} ->
@@ -408,6 +533,77 @@ defmodule KeenPhoenixSvelte.Apps.ProxyCache do
 
       {:error, reason} ->
         {:error, reason}
+    end
+  end
+
+  # Verify the origin's certificate against the system trust store and check the
+  # hostname (OTP 25+ `:public_key.cacerts_get/0`; the lib requires OTP 26+). An
+  # operator can override the whole list via `:proxy_cache` `:ssl_options`.
+  @doc false
+  def ssl_opts do
+    case Application.get_env(:keen_phoenix_svelte, :proxy_cache, [])[:ssl_options] do
+      opts when is_list(opts) ->
+        opts
+
+      _ ->
+        [
+          verify: :verify_peer,
+          cacerts: :public_key.cacerts_get(),
+          depth: 3,
+          customize_hostname_check: [
+            match_fun: :public_key.pkix_verify_hostname_match_fun(:https)
+          ]
+        ]
+    end
+  end
+
+  # ── manifest parsing (servable-file allowlist) ────────────────────────────
+
+  # A `.json` manifest is either a flat array of paths or an object whose string
+  # leaves are collected (so a Vite `manifest.json` — `{ "src": { "file": … } }` —
+  # works as-is). Anything else is a newline list (blank / `#`-comment lines
+  # ignored). Paths are normalized to the same shape a request sub-path has.
+  defp parse_manifest(url, body) when is_binary(body) do
+    entries =
+      if json_manifest?(url) do
+        case Jason.decode(body) do
+          {:ok, data} -> collect_paths(data)
+          {:error, _} -> []
+        end
+      else
+        body
+        |> String.split(~r/\r?\n/)
+        |> Enum.map(&String.trim/1)
+        |> Enum.reject(&(&1 == "" or String.starts_with?(&1, "#")))
+      end
+
+    entries |> Enum.map(&normalize_manifest_path/1) |> MapSet.new()
+  end
+
+  defp parse_manifest(_url, _body), do: MapSet.new()
+
+  defp json_manifest?(url), do: url |> strip_scheme() |> String.downcase() |> String.ends_with?(".json")
+
+  defp strip_scheme("file-glob:" <> p), do: p
+  defp strip_scheme("file:" <> p), do: p
+  defp strip_scheme(url), do: url
+
+  defp collect_paths(list) when is_list(list), do: Enum.flat_map(list, &collect_paths/1)
+  defp collect_paths(map) when is_map(map), do: map |> Map.values() |> Enum.flat_map(&collect_paths/1)
+  defp collect_paths(str) when is_binary(str), do: [str]
+  defp collect_paths(_), do: []
+
+  defp normalize_manifest_path(path),
+    do: path |> String.trim() |> String.trim_leading("./") |> String.trim_leading("/")
+
+  # ── config helpers ────────────────────────────────────────────────────────
+
+  defp cfg, do: Application.get_env(:keen_phoenix_svelte, :proxy_cache, [])
+
+  defp negative_ttl do
+    case cfg()[:negative_ttl] do
+      n when is_integer(n) and n >= 0 -> n
+      _ -> @default_negative_ttl
     end
   end
 

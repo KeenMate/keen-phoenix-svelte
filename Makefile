@@ -79,7 +79,7 @@ kill-port:
 	@echo "Freeing port $(PORT)..."
 ifeq ($(OS),Windows_NT)
 	-@export MSYS_NO_PATHCONV=1; \
-	  netstat -ano | grep -E ":$(PORT) .*LISTENING" | awk '{print $$5}' | sort -u \
+	  netstat -ano | grep -E ":$(PORT) .*LISTENING" | awk '!seen[$$5]++ {print $$5}' \
 	    | xargs -r -I{} taskkill /F /PID {}
 else
 	-@lsof -ti tcp:$(PORT) | xargs -r kill -9

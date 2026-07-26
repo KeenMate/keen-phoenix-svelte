@@ -84,9 +84,9 @@ export default (target, { props, context, live, api, channel, bus }) => {
 
   async function toggle() {
     if (live) {
-      live.pushEvent("toggle_like", { id });            // LiveView page
+      live.pushEvent("toggle_like", { id });         // LiveView page
     } else {
-      const res = await api.post("/api/like", { id });  // plain page
+      const res = await api.post("/like", { id });   // plain page (→ /api/like via api_base)
       liked = res.liked;
     }
   }
@@ -116,6 +116,12 @@ renders into an element. The job is always the same: **produce one self-containe
 ES module that default-exports the contract**, adapting the framework's lifecycle
 onto `{ setProps, destroy }`. All the recipes below are real, working apps in
 `example/assets/apps/`.
+
+> **Add the framework's runtime to `assets/package.json` first.** Only Svelte's
+> toolchain is in the [install steps](installation.md#2-javascript); for any other
+> framework, install its runtime alongside — `npm install lit`, or
+> `npm install react react-dom`, etc. (Vite bundles it into the island's `.mjs` in
+> library mode.) Plain-JS islands need nothing extra.
 
 ### The build: Vite library mode
 

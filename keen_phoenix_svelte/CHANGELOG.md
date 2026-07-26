@@ -5,7 +5,52 @@ All notable changes to `keen_phoenix_svelte` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.0.0-rc.8] - 2026-07-26 [PUBLISHED]
+
+### Security
+
+- **Hardened the app proxy's upstream fetch and responses.** The built-in `:httpc`
+  client now verifies TLS certificates (`verify: :verify_peer` against the system
+  trust store, with hostname checking) so the Phoenix→origin leg — whose bytes run
+  same-origin in users' browsers — can't be MITM'd; override via `proxy_cache:
+  [ssl_options: […]]`. It no longer follows upstream redirects (`autoredirect:
+  false`), closing an SSRF path where a malicious 30x could redirect the fetch to an
+  internal address. Proxied responses now send `X-Content-Type-Options: nosniff`.
+  Local `:dir` sub-paths are additionally asserted to resolve **within** the
+  configured directory (defense in depth over the existing `..`/backslash rejection).
+  See the new "Security & trust model" section in the external-apps guide.
+- **Bounded the app proxy's sub-path fan-out.** A `base:`/`dir:` app proxies any
+  sub-path, so an unauthenticated flood of guaranteed-miss paths could otherwise
+  drive unbounded outbound fetches. Concurrent upstream fetches are now capped
+  (`proxy_cache: [max_concurrent_fetches: 32]`; excess sheds with `503 + Retry-After`),
+  and a definitive upstream `404`/`410` (or a missing local file) is negative-cached
+  briefly (`proxy_cache: [negative_ttl: :timer.seconds(10)]`, `0` to disable) so the
+  same miss isn't re-fetched every request.
+
+### Added
+
+- **Per-app `manifest:` allowlist for base/dir bundles.** Register the exact set of
+  files an app ships — an inline list, or a path to a JSON/text manifest in the
+  bundle (a Vite `manifest.json` is parsed for its output files) — and any sub-path
+  not in it is a `404` decided **before** any upstream fetch. The declared `entry:`
+  and the manifest file itself are always allowed; a manifest that can't be loaded
+  fails open (the fetch bounds above still apply). Closes the sub-path fan-out for
+  apps that opt in.
+- **`keenManifest()` Vite plugin** (`@keenmate/phoenix_svelte/vite/manifest`) that
+  generates the custom manifest — a flat JSON array of servable files — by scanning
+  the build output in `closeBundle`. Unlike Vite's graph-only `manifest.json`, this
+  captures `public/` assets (fonts, images, favicons) that Vite copies verbatim, so
+  a `manifest:`-restricted app doesn't 404 its own static files. Point the app at
+  `manifest: "keen-manifest.json"`.
+- **Configurable proxy `Cache-Control`** — the browser-facing `Cache-Control` the
+  app proxy emits is now fully tunable. A new global `proxy_cache:
+  [immutable_cache_control: "…"]` overrides what a per-app `immutable: true` emits
+  (the built-in 1-year immutable string stays the default), and a per-app
+  `client_cache_control: "…"` string sets an exact header for that one app. The
+  value is resolved most-specific-first: per-app `client_cache_control` → per-app
+  `immutable: true` (→ `immutable_cache_control`) → global `client_cache_control` →
+  built-in default. Previously the immutable string was hard-coded and no per-app
+  custom header existed.
 
 ### Changed
 
@@ -15,6 +60,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `phx-hook="KeenApp"` and `getHooks()` returns `{ KeenApp }`, so consumers that
   register hooks with `hooks: getHooks()` need no change. **Breaking** only if you
   registered the hook by its literal name — rename that key `KeenSvelte` → `KeenApp`.
+
+### Fixed
+
+- **Docs — `api` helper paths are relative to `api_base`.** The server-communication
+  and authoring guides showed island calls double-prefixed (`api.post("/api/like",
+  …)`) alongside `api_base: "/api"`, which the helper resolves to `/api/api/like`
+  (a 404); corrected to relative paths (`api.post("/like", …)`). Also clarified in
+  the install guide that pre-release (`rc`) versions must be pinned exactly (`~> 1.0`
+  / `^1.0` don't match pre-releases), and that non-Svelte islands need their
+  framework runtime (`lit`, `react`, …) added to `assets/package.json`.
 
 ## [1.0.0-rc.7] - 2026-07-25 [PUBLISHED]
 

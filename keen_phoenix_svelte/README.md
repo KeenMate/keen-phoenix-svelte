@@ -30,15 +30,18 @@ Lit, React and vanilla-JS islands through it.
 > **[Philosophy & comparison](docs/philosophy.md)** — the autonomous-island model,
 > what this deliberately doesn't do, and how it differs from `live_svelte`.
 
+## What's New in v1.0.0-rc.8
+
+- **Hook renamed `KeenSvelte` → `KeenApp`** — the island hook mounts any framework (Svelte, React, Lit, vanilla JS), so the name now matches the neutral vocabulary (`<.app>`, `data-app`, `AppsManager`). `getHooks()` still returns it, so `hooks: getHooks()` needs no change — **breaking only** if you registered the hook by its literal name.
+- **App proxy hardened** — the built-in `:httpc` fetcher now verifies TLS against the system trust store (no MITM on the Phoenix→origin leg), refuses upstream redirects (SSRF guard), sends `X-Content-Type-Options: nosniff`, and confirms local `:dir` sub-paths resolve inside their directory. See the new "Security & trust model" section in the external-apps guide.
+- **Sub-path fan-out is bounded** — concurrent upstream fetches are capped (`max_concurrent_fetches`, excess sheds `503 + Retry-After`) and definitive upstream 404s are briefly negative-cached (`negative_ttl`), so a flood of guaranteed-miss paths can't drive unbounded outbound requests.
+- **`manifest:` allowlist for base/dir apps** — register the exact files an app ships (an inline list, or a JSON/text manifest in the bundle — a Vite `manifest.json` is parsed as-is), and any other sub-path is a `404` decided *before* any upstream fetch.
+- **`keenManifest()` Vite plugin** (`@keenmate/phoenix_svelte/vite/manifest`) — generates that allowlist by scanning the build output, so it also covers `public/` assets (fonts, images, favicons) Vite's own graph-only manifest misses.
+- **Configurable proxy `Cache-Control`** — tune the browser-facing header globally or per app (`client_cache_control`, `immutable_cache_control`), resolved most-specific-first.
+
 ## What's New in v1.0.0-rc.7
 
 - **Pick a view with `<.app component="…">`** — a first-class attribute for multi-component islands, desugaring to a `component` prop (it wins over one already in `props`). Keep related views (say a chart and a table) in one app so they share a single imported runtime, and select between them per `<.app>` — instead of separate apps that each inline their own copy of the framework.
-
-## What's New in v1.0.0-rc.6
-
-- **Eager mounting — paint before the socket connects** — `<.app eager>` mounts an island the instant `app.js` parses instead of waiting for the LiveView hook, collapsing the cold-load gap between the server-rendered placeholder and the live island. It starts without `live` and is upgraded once the socket connects — ideal for islands that draw from `api`, a `channel`, or another server. A no-op on plain pages.
-- **`liveStatus` on the boundary** — every island now knows whether `live` is here (`"ready"`), coming (`"pending"`, an eager mount), or never present (`"none"`, a plain page) — enough to show a loader while waiting and choose the right transport.
-- **`keen:live-ready`** — a `CustomEvent` (with `detail.live`), plus an optional `setLive(live)` handle method, fired when an eagerly-mounted island's `live` bridge arrives. Server-pushed prop updates keep flowing the whole time; only imperative `live.*` calls need the bridge.
 
 ## How it works
 

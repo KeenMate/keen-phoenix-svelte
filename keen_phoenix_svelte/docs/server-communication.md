@@ -42,9 +42,9 @@ transport:
 
 ```js
 if (live) {
-  live.pushEvent("toggle_like", { id });                  // websocket, LiveView
+  live.pushEvent("toggle_like", { id });               // websocket, LiveView
 } else {
-  const { liked } = await api.post("/api/like", { id });  // REST, CSRF+session
+  const { liked } = await api.post("/like", { id });   // REST, CSRF+session
 }
 ```
 
@@ -118,11 +118,15 @@ and after — the bridge arrives. Only the imperative `live.*` calls need it.
 A `fetch` wrapper that attaches `x-csrf-token` and sends the session cookie.
 Works on any page (LiveView or plain).
 
+Paths are **relative to `context.api_base`** — the helper prepends it. With
+`api_base: "/api"` (above), `api.get("/org/42")` requests `/api/org/42`; **don't**
+repeat the `/api` prefix in the path or you'll get `/api/api/org/42`.
+
 ```js
-await api.get("/api/org/42")
-await api.post("/api/node", { parent_id: 1 })
-await api.put("/api/node/5", { name: "…" })
-await api.delete("/api/node/5")
+await api.get("/org/42")            // → GET /api/org/42
+await api.post("/node", { parent_id: 1 })
+await api.put("/node/5", { name: "…" })
+await api.delete("/node/5")
 ```
 
 Put the endpoints behind a pipeline that does `fetch_session` +

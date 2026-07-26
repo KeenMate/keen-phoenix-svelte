@@ -125,6 +125,13 @@ defmodule KeenPhoenixSvelte.AppsTest do
     assert Apps.resolve(["dash", "..", "secret"]) == nil
   end
 
+  test "local :dir app allows a legit nested sub-path (containment doesn't over-block)" do
+    Application.put_env(:keen_phoenix_svelte, :apps, %{"dash" => %{dir: "/srv/apps/dash"}})
+
+    assert Apps.resolve(["dash", "assets", "x.css"]) ==
+             {"dash", "file:" <> Path.join("/srv/apps/dash", "assets/x.css"), "assets/x.css"}
+  end
+
   test "proxy_opts merges per-app ttl/immutable over the global :proxy_cache config" do
     orig_cache = Application.get_env(:keen_phoenix_svelte, :proxy_cache)
     on_exit(fn -> restore(:proxy_cache, orig_cache) end)
@@ -140,6 +147,29 @@ defmodule KeenPhoenixSvelte.AppsTest do
     assert %{ttl_ms: 1_000, respect_upstream: false, immutable: false} = Apps.proxy_opts("plain")
     assert %{ttl_ms: 250} = Apps.proxy_opts("quick")
     assert %{immutable: true} = Apps.proxy_opts("pinned")
+  end
+
+  test "proxy_opts surfaces per-app + global cache-control overrides separately" do
+    orig_cache = Application.get_env(:keen_phoenix_svelte, :proxy_cache)
+    on_exit(fn -> restore(:proxy_cache, orig_cache) end)
+
+    Application.put_env(:keen_phoenix_svelte, :proxy_cache,
+      client_cache_control: "public, max-age=60",
+      immutable_cache_control: "public, max-age=604800, immutable"
+    )
+
+    Application.put_env(:keen_phoenix_svelte, :apps, %{
+      "plain" => "https://cdn/plain.mjs",
+      "hourly" => %{url: "https://cdn/hourly.mjs", client_cache_control: "public, max-age=3600"}
+    })
+
+    assert %{
+             client_cache_control: nil,
+             global_cache_control: "public, max-age=60",
+             immutable_cache_control: "public, max-age=604800, immutable"
+           } = Apps.proxy_opts("plain")
+
+    assert %{client_cache_control: "public, max-age=3600"} = Apps.proxy_opts("hourly")
   end
 
   test "local apps are detected and merged into the manifest with convention URLs" do

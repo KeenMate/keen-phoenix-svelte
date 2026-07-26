@@ -200,19 +200,26 @@ config :keen_phoenix_svelte,
   proxy_cache: [
     ttl: :timer.minutes(5),   # fallback when the origin sends no cache directives
     respect_upstream: true,   # honor upstream Cache-Control / ETag / Last-Modified
-    client_cache_control: "public, max-age=60, stale-while-revalidate=300"
+    client_cache_control: "public, max-age=60, stale-while-revalidate=300",
+    # what `immutable: true` emits (defaults to a 1-year immutable string):
+    immutable_cache_control: "public, max-age=31536000, immutable"
   ],
   apps: %{
     # a truly versioned, immutable URL can skip revalidation entirely:
     "org-chart" => %{url: "https://cdn.acme.com/org-chart@1.4.2/main.mjs", immutable: true},
     # a bare, unversioned file is re-checked every minute:
-    "status" => %{url: "https://cdn.acme.com/status.js", ttl: :timer.minutes(1)}
+    "status" => %{url: "https://cdn.acme.com/status.js", ttl: :timer.minutes(1)},
+    # an explicit per-app browser Cache-Control wins over everything:
+    "hourly" => %{url: "https://cdn.acme.com/hourly/main.mjs", client_cache_control: "public, max-age=3600"}
   }
 ```
 
-The proxy also forwards an `ETag` and answers the browser's `If-None-Match` with
-a `304`, so the browser → Phoenix → origin conditional chain revalidates cheaply
-end-to-end.
+The browser-facing `Cache-Control` is resolved most-specific-first: a per-app
+`client_cache_control:` string, else a per-app `immutable: true` (emitting the
+global `immutable_cache_control`, or a built-in 1-year immutable string), else the
+global `client_cache_control`, else the built-in default. The proxy also forwards
+an `ETag` and answers the browser's `If-None-Match` with a `304`, so the browser →
+Phoenix → origin conditional chain revalidates cheaply end-to-end.
 
 Per-app override, if some apps should stay direct:
 
@@ -251,14 +258,133 @@ Each file is typed by its extension (`.mjs`/`.js` → `text/javascript`, `.css` 
 `text/css`, otherwise `MIME`), while JS is always forced to a module-friendly type
 regardless of what the origin reports. `..` and other unsafe segments are rejected
 before any upstream fetch. Every file shares the app's cache/revalidation and
-`ttl`/`immutable` settings. A single-file app (`url:`) is unchanged — it's just the
-one-file case.
+`ttl` / `immutable` / `client_cache_control` settings. A single-file app (`url:`)
+is unchanged — it's just the one-file case.
 
 > A bundle whose entry doesn't ESM-`export default` a mount function (e.g. a UMD
 > build that sets `window.SomethingCreate`) still can't mount directly — write a
 > thin adapter entry that imports the vendor files (now same-origin) and adapts
 > them to `(target, opts) => { setProps, destroy }`. Base-path proxying is what
 > gets all those files delivered.
+
+### A code-split app (many chunks)
+
+The same base-path registration handles your **own** app when it's big enough to
+code-split — a dashboard that lazy-loads routes, say, whose build emits
+`main.mjs` plus a pile of hashed `chunk-*.js`, CSS, and assets. Register the
+output **directory**, not the single entry file:
+
+```elixir
+config :keen_phoenix_svelte,
+  load_mode: :proxy,
+  apps: %{
+    # remote: the whole build directory on a CDN…
+    "huge-app-3000" => %{base: "https://cdn.acme.com/huge-app-3000@2/", entry: "main.mjs"},
+    # …or local: a directory the Phoenix node can see (entry may be a glob).
+    "dash" => %{dir: "/srv/apps/dash", entry: "main.mjs"}
+  }
+```
+
+The one thing that makes or breaks it is **where the chunk URLs point**. The
+browser requests each chunk at whatever URL your bundler baked into the entry, so
+that URL has to resolve back under `/apps/huge-app-3000/` for the proxy to see it:
+
+- **Set the bundler's base** to the app's proxy prefix — Vite `base:
+  "/apps/huge-app-3000/"` (Rollup `output.dir` + a matching public path). Then a
+  dynamic `import("./chunk-x.js")` fetches `/apps/huge-app-3000/chunk-x.js`, which
+  `resolve/1` matches on the first segment and proxies to `<base>/chunk-x.js`.
+- **Or keep references relative** to the module — `new URL("./chunk-x.js",
+  import.meta.url)` — which resolves against the served location automatically, no
+  build-time base needed.
+
+If instead the build hard-codes an absolute path (`/assets/…`) or a different
+origin, those requests never reach this proxy and 404 (or leak cross-origin).
+Registering the app single-file (`url:`) has the same effect — only the exact name
+resolves, so every chunk 404s. `base:` / `dir:` is what opens the whole prefix.
+
+Once the URLs line up, nothing else is special: each chunk is typed by its
+extension, rejected if it contains `..`, and shares the **one** registration's
+cache — its `ttl` / `immutable` / `client_cache_control`. In `:direct` mode the
+chunks load straight from the CDN relative to `main.mjs` instead (no proxy in the
+path) — same code-splitting, just cross-origin.
+
+### Restricting to a manifest (`manifest:`)
+
+A `base:`/`dir:` app proxies **any** sub-path under its prefix — including ones
+that don't exist. That's not a security hole (the host is fixed by config; `..` is
+rejected), but an unauthenticated client can still make you fetch a stream of
+guaranteed-miss paths (`/apps/huge-app-3000/does-not-exist-N.js`). Two bounds are
+always on: concurrent upstream fetches are capped (`proxy_cache:
+[max_concurrent_fetches: 32]`), and a definitive upstream 404 is briefly
+remembered (`negative_ttl`, default 10s) so the same miss isn't re-fetched.
+
+To close it completely, hand the app the **exact list of files it ships** — then
+anything else is a `404` decided locally, *before* any upstream fetch:
+
+```elixir
+apps: %{
+  # inline — you know the file set up front:
+  "player" => %{base: "https://cdn.acme.com/player@3/",
+                manifest: ["player.mjs", "player.css", "fonts/inter.woff2"]},
+
+  # or point at a file in the bundle — fetched + cached like any asset, re-parsed
+  # only when it changes:
+  "huge-app-3000" => %{base: "https://cdn.acme.com/huge-app-3000@2/",
+                       manifest: "keen-manifest.json"}
+}
+```
+
+Every entry is a sub-path **relative to the app's `base:`** (the part after
+`/apps/<name>/`), matched exactly after normalization (leading `./` or `/` and
+surrounding whitespace are stripped; nested folders like `assets/fonts/x.woff2`
+are fine at any depth). The declared `entry:` and the manifest file itself are
+always allowed even if absent. If the manifest can't be loaded it **fails open**
+(reverts to the always-on bounds above), so a transient CDN blip never 404s your
+whole app.
+
+A `manifest:` string is fetched, cached like any asset, and re-parsed only when it
+changes. The parser accepts three shapes, auto-detected:
+
+- **flat JSON array** — `["main.mjs", "assets/x.js"]`. This is the *custom format*;
+  generate it with the plugin below.
+- **Vite `manifest.json`** — the object Vite emits with `build.manifest: true`. All
+  string leaves (`file`/`css`/`assets`/…) are pulled out automatically, so you can
+  point straight at `.vite/manifest.json` with no transformation.
+- **newline text** — one path per line, `#` comments and blank lines ignored.
+
+#### Which format? — the `public/` gap
+
+Vite's own `manifest.json` only lists what's in the **module graph**: entry
+chunks, code-split chunks, and assets *imported* from JS/CSS. Files Vite copies
+verbatim from **`public/`** (favicons, fonts you drop in, images referenced only
+by a runtime-built URL) never appear in it — so a strict Vite manifest would `404`
+them. If your app serves any `public/` assets, use the **custom format** instead:
+it's generated by scanning the finished output directory, so it captures
+*everything that ships*, graph or not.
+
+#### Generating the custom manifest
+
+Ship it from your build with the bundled Vite plugin — it walks `outDir` in the
+final `closeBundle` hook (after `public/` is copied) and writes a sorted flat
+array to `keen-manifest.json`:
+
+```js
+// assets/apps.vite.config.js
+import { defineConfig } from "vite"
+import { appConfig } from "@keenmate/phoenix_svelte/vite"
+import { keenManifest } from "@keenmate/phoenix_svelte/vite/manifest"
+
+export default defineConfig(({ mode }) => {
+  const config = appConfig({ appName: process.env.SVELTE_APP, mode })
+  config.plugins.push(keenManifest())          // → outDir/keen-manifest.json
+  return config
+})
+```
+
+`keenManifest({ fileName })` takes an optional output name (default
+`"keen-manifest.json"`). Register the app with the matching
+`manifest: "keen-manifest.json"` and you're done — the paths it emits already
+match the sub-path shape the proxy compares against.
 
 ## Local folder: a content-hashed bundle on a volume
 
@@ -300,6 +426,47 @@ Two constraints:
 - **Ambiguity → newest wins.** If a deploy leaves both the old and new hash in the
   folder, the most-recently-modified file is chosen. Have the writer swap
   atomically (write-then-`rename`) so a half-written file is never globbed.
+
+## Security & trust model
+
+The proxy fetches upstream bytes and serves them **same-origin** — your users'
+browsers execute them as first-party script. A few boundaries follow from that:
+
+- **The registry is the trust root.** Whoever controls the `:apps` map (or the
+  database that feeds it) chooses which hosts the server fetches and whose bytes run
+  on your origin. If the registry is tenant- or user-driven, treat each entry as
+  untrusted input: validate the host against an allowlist before registering it.
+  A client **cannot** point the fetch elsewhere — sub-path segments can't contain
+  `/`, and the authority is fixed by the configured `base:`/`url:` — so the only way
+  to reach an arbitrary host is to control the registry.
+- **`<.app name={…}>` must not be user-controlled.** The name becomes the mount
+  target and, for an unregistered name, the `import()` path
+  (`/apps/<name>/main.mjs`). It's a developer-authored identifier, like a route —
+  never interpolate request data into it.
+- **TLS is verified and redirects are not followed.** The built-in fetcher pins
+  `verify: :verify_peer` against the system trust store (so the Phoenix→origin leg
+  can't be MITM'd) and uses `autoredirect: false` (so a malicious upstream can't
+  30x-redirect the fetch to an internal address). Override the TLS options with
+  `proxy_cache: [ssl_options: […]]`, or swap the whole client via `:app_provider`
+  (e.g. Finch/Req) if you need redirect-following or a different policy.
+- **Assets are typed by us, with `nosniff`.** Each response carries an explicit
+  `Content-Type` and `X-Content-Type-Options: nosniff`, so a browser won't
+  MIME-sniff a bundle into something executable it shouldn't be. Note that a
+  `base:`/`dir:` app serves **any** sub-path extension same-origin (an `.html` or
+  `.svg` sibling included) — fine when the upstream is fully trusted, a stored-XSS
+  vector if it ever hosts untrusted content. Keep bundle directories to code +
+  assets you control.
+- **Local `:dir` reads are contained.** Sub-paths are rejected if they contain
+  `..`, empty, `.`, or backslash segments, and the resolved file is asserted to sit
+  under the app's `:dir` before any read — a symlink or odd segment that resolves
+  outside the tree is a `404`, never a disk read.
+- **Sub-path fan-out is bounded.** A `base:`/`dir:` app proxies any sub-path under
+  its prefix, so a flood of guaranteed-miss paths could otherwise drive unbounded
+  outbound fetches. Three defenses: concurrent upstream fetches are capped
+  (`max_concurrent_fetches`, excess sheds with `503`), a definitive `404` is
+  negative-cached briefly (`negative_ttl`), and — strongest — a `manifest:`
+  allowlist rejects any unlisted file locally before a fetch (see
+  [above](#restricting-to-a-manifest-manifest)).
 
 ## Notes
 

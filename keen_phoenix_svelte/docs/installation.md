@@ -10,6 +10,14 @@ Add the dependency (`mix.exs`):
 {:keen_phoenix_svelte, "~> 1.0"}
 ```
 
+> **Installing a pre-release (`rc`)?** SemVer ranges like `~> 1.0` (Hex) and
+> `^1.0` (npm) **do not match pre-releases**, so during the `rc` phase you must
+> pin the exact version on *both* sides — and keep them in lockstep:
+> `{:keen_phoenix_svelte, "1.0.0-rc.7"}` in `mix.exs`, and
+> `"@keenmate/phoenix_svelte": "1.0.0-rc07"` in `assets/package.json` (note the
+> npm rc form is zero-padded, no dot). Once `1.0.0` is out, `~> 1.0` / `^1.0` are
+> correct.
+
 Import the components wherever you render HTML — typically `html_helpers/0` in
 your `*_web.ex`, so `<.app>` and `<KeenPhoenixSvelte.runtime>` are available
 everywhere:

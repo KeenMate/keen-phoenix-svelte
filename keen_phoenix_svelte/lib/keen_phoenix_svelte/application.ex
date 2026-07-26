@@ -8,7 +8,12 @@ defmodule KeenPhoenixSvelte.Application do
   @impl true
   def start(_type, _args) do
     children = [
-      {Task.Supervisor, name: KeenPhoenixSvelte.Apps.ProxyTaskSupervisor},
+      # `max_children` caps concurrent upstream fetches so a flood of distinct
+      # sub-paths can't spawn unbounded tasks/sockets (the GenServer refuses new
+      # fetches at the same ceiling and serves stale / 503 instead).
+      {Task.Supervisor,
+       name: KeenPhoenixSvelte.Apps.ProxyTaskSupervisor,
+       max_children: KeenPhoenixSvelte.Apps.ProxyCache.max_concurrent_fetches()},
       KeenPhoenixSvelte.Apps.ProxyCache
     ]
 
