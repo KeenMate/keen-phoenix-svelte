@@ -317,9 +317,9 @@ defmodule ExampleWeb.Layouts do
           How it's connected
         </p>
         <dl class="space-y-3">
-          <div :for={w <- @wire} class="grid grid-cols-[5rem_1fr] gap-2 items-baseline">
+          <div :for={w <- @wire} class="space-y-1">
             <dt>
-              <code class="text-xs font-mono px-1.5 py-0.5 rounded bg-primary/10 text-primary">
+              <code class="text-xs font-mono px-1.5 py-0.5 rounded bg-primary/10 text-primary break-all">
                 {w.label}
               </code>
             </dt>

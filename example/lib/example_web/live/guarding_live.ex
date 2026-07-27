@@ -212,11 +212,42 @@ defmodule ExampleWeb.GuardingLive do
           </p>
           <pre class="mt-2 bg-base-300/50 rounded-lg p-3 overflow-x-auto text-[0.72rem] leading-relaxed"><code>{@config_snippet}</code></pre>
           <p class="mt-3 text-base-content/70">
-            The manifest is just the list of servable files (a flat JSON array here;
-            a Vite <code>manifest.json</code>
-            or the <code>keenManifest()</code> plugin's output work too):
+            The manifest is just the list of servable files — each path relative to
+            <code>base:</code>. Three shapes are auto-detected: a
+            <strong>flat JSON array</strong>
+            (below), a <strong>Vite <code>manifest.json</code></strong>
+            (its output files are pulled out for you), or a
+            <strong>newline list</strong>. Generate it with the
+            <code>keenManifest()</code> Vite plugin, or hand-write it like this:
           </p>
           <pre class="mt-2 bg-base-300/50 rounded-lg p-3 overflow-x-auto text-[0.72rem] leading-relaxed"><code>{@manifest_snippet}</code></pre>
+
+          <p class="mt-4 font-medium text-sm">How the proxy reads it, per request</p>
+          <ol class="mt-2 space-y-2 text-sm text-base-content/70 list-decimal pl-5 marker:text-base-content/40">
+            <li>
+              The <strong>entry</strong>
+              (<code>main.mjs</code>) and the manifest file itself are
+              <strong>always allowed</strong> — even if you forget to list them.
+            </li>
+            <li>
+              Any other sub-path must be an <strong>exact match</strong>
+              in the list (paths are normalized; nested paths like
+              <code>views/charts.mjs</code> match at any depth).
+            </li>
+            <li>
+              A miss is a <code>404</code> decided <strong>locally, before any
+              upstream fetch</strong> — the origin is never touched.
+            </li>
+            <li>
+              The manifest is fetched and cached like any file, and
+              <strong>re-parsed only when the bundle changes</strong> (keyed by ETag).
+            </li>
+            <li>
+              If the manifest itself can't be loaded, the app <strong>fails open</strong>
+              — <code>negative_ttl</code> and <code>max_concurrent_fetches</code>
+              still bound abuse, so it's a tightening, not a single point of failure.
+            </li>
+          </ol>
         </section>
       </div>
 
