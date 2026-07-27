@@ -146,6 +146,12 @@ defmodule ExampleWeb.Layouts do
                   label={I18n.t(@locale, "nav.proxyingPlain")}
                 />
                 <.nav_item
+                  navigate={~p"/guarding"}
+                  active={@active == :guarding}
+                  icon="hero-shield-check"
+                  label={I18n.t(@locale, "nav.guarding")}
+                />
+                <.nav_item
                   navigate={~p"/eager"}
                   active={@active == :eager}
                   icon="hero-rocket-launch"

@@ -1,0 +1,9 @@
+[
+  "main.mjs",
+  "dashboard.css",
+  "icon.svg",
+  "data.json",
+  "views/overview.mjs",
+  "views/charts.mjs",
+  "views/table.mjs"
+]

@@ -102,6 +102,12 @@ defmodule KeenPhoenixSvelte.Apps.Proxy do
         # fetches. Retryable, so nudge the client to come back.
         conn |> put_resp_header("retry-after", "1") |> send_resp(503, "app proxy busy") |> halt()
 
+      {:error, {:status, status}} when status in [404, 410] ->
+        # A definitive upstream "not found"/"gone" is a genuine 404/410 for *this
+        # file* — not a gateway failure — so relay it as-is (it's also negative-
+        # cached like any miss). Everything else below is a real upstream error.
+        conn |> send_resp(status, "app file not found") |> halt()
+
       {:error, reason} ->
         Logger.error("[keen_phoenix_svelte] app proxy failed for #{url}: #{inspect(reason)}")
         conn |> send_resp(502, "app upstream error") |> halt()

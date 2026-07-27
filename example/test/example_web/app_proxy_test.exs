@@ -279,6 +279,20 @@ defmodule ExampleWeb.AppProxyTest do
     assert response(conn, 502)
   end
 
+  test "a definitive upstream 404/410 is relayed to the client, not masked as 502", %{conn: conn} do
+    url404 = "https://cdn.example/missing-#{System.unique_integer([:positive])}.mjs"
+    url410 = "https://cdn.example/gone-#{System.unique_integer([:positive])}.mjs"
+    Application.put_env(:keen_phoenix_svelte, :apps, %{"missing" => url404, "gone" => url410})
+
+    Application.put_env(:keen_phoenix_svelte, :app_provider, fn
+      ^url404 -> {:error, {:status, 404}}
+      ^url410 -> {:error, {:status, 410}}
+    end)
+
+    assert response(get(conn, "/apps/missing"), 404)
+    assert response(get(conn, "/apps/gone"), 410)
+  end
+
   defp restore_proxy_cache(nil), do: Application.delete_env(:keen_phoenix_svelte, :proxy_cache)
   defp restore_proxy_cache(orig), do: Application.put_env(:keen_phoenix_svelte, :proxy_cache, orig)
 

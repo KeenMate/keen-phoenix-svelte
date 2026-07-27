@@ -5,6 +5,17 @@ All notable changes to `keen_phoenix_svelte` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0-rc.9] - 2026-07-27 [PUBLISHED]
+
+### Fixed
+
+- **The app proxy relays a definitive upstream `404`/`410` instead of masking it
+  as `502`.** A missing sub-path on a `base:`/`dir:` app now returns a genuine
+  `404` (and `410 Gone` for gone resources), matching the `manifest:`-blocked case
+  and letting a browser tell "file not found" apart from a real gateway failure.
+  Other upstream errors (timeouts, DNS, `5xx`) still surface as `502`. Misses are
+  negative-cached exactly as before.
+
 ## [1.0.0-rc.8] - 2026-07-26 [PUBLISHED]
 
 ### Security

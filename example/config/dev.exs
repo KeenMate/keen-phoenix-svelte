@@ -23,6 +23,23 @@ config :keen_phoenix_svelte,
       entry: "main.mjs",
       mode: :proxy,
       ttl: :timer.seconds(60)
+    },
+    # The /guarding demo: a code-split `dashboard` bundle (entry + lazy view
+    # chunks + css + svg + data.json) registered TWICE against the same origin to
+    # contrast the `manifest:` allowlist. `dashboard-guarded` may serve only the
+    # files in keen-manifest.json (anything else 404s before any upstream fetch);
+    # `dashboard-open` proxies any sub-path (misses hit upstream once, then
+    # negative-cache). Dev origin is our own /external stand-in; live it's the CDN.
+    "dashboard-guarded" => %{
+      base: "http://localhost:4000/external/dashboard/",
+      entry: "main.mjs",
+      manifest: "keen-manifest.json",
+      mode: :proxy
+    },
+    "dashboard-open" => %{
+      base: "http://localhost:4000/external/dashboard/",
+      entry: "main.mjs",
+      mode: :proxy
     }
   }
 

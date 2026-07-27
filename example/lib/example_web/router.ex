@@ -43,6 +43,7 @@ defmodule ExampleWeb.Router do
       live "/videos", VideosLive, :index
       live "/calendar", CalendarLive, :index
       live "/proxying", ProxyingLive, :index
+      live "/guarding", GuardingLive, :index
       live "/eager", EagerLive, :index
       live "/stress", StressLive, :index
       live "/widgets", WidgetsLive, :index

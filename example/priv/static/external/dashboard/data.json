@@ -1,0 +1,13 @@
+{
+  "kpis": [
+    { "label": "Revenue", "value": "$48.2k", "delta": 12 },
+    { "label": "Active users", "value": "1,284", "delta": 4 },
+    { "label": "Churn", "value": "2.1%", "delta": -3 }
+  ],
+  "series": [4, 9, 6, 12, 7, 3, 10, 8],
+  "rows": [
+    { "name": "Acme Corp", "plan": "Enterprise", "seats": 120 },
+    { "name": "Globex", "plan": "Team", "seats": 32 },
+    { "name": "Initech", "plan": "Starter", "seats": 8 }
+  ]
+}
