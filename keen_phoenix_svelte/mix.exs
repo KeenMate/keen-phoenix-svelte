@@ -62,6 +62,7 @@ defmodule KeenPhoenixSvelte.MixProject do
         "docs/packaging-apps.md": [title: "Island-able vs page-owning apps"],
         "docs/installation.md": [title: "Installation & setup"],
         "docs/authoring-apps.md": [title: "Authoring apps"],
+        "docs/runtime-context.md": [title: "Runtime context (user & tokens)"],
         "docs/server-communication.md": [title: "Server communication"],
         "docs/multiple-apps.md": [title: "Worked example: multiple apps"],
         "docs/external-apps.md": [title: "External apps (CDN, direct vs proxy)"],

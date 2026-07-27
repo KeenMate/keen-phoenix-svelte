@@ -77,6 +77,7 @@ steps in [Installation & setup](docs/installation.md).
 
 - [Installation & setup](docs/installation.md) — wire the library into your app
 - [Authoring apps](docs/authoring-apps.md) — folder layout, the mount contract, Svelte 5 & 4
+- [Runtime context (user & tokens)](docs/runtime-context.md) — relay user identity and a shared JWT to islands
 - [Server communication](docs/server-communication.md) — runtime context, `live`, `api`, `channel`, `bus`
 - [External apps (CDN, direct vs proxy)](docs/external-apps.md) — load islands from elsewhere, and the `:direct`/`:proxy` delivery modes
 
