@@ -46,6 +46,32 @@ defmodule ExampleWeb.InlineEditLive do
   end
   """
 
+  @toolbar_snippet """
+  # inline_edit_live.ex — the toolbar is HEEx + CSS, no JavaScript.
+  <div :for={block <- @blocks} class="group relative ...">   # relative anchors it; group enables hover
+    <div class="prose ...">{raw(block.html)}</div>
+
+    # Existence: rendered only when admin is on and this block isn't already open.
+    # Appearance: `hidden group-hover:flex` reveals it on hover — pure CSS.
+    <div :if={@admin and not editing?(@editing, block.id)}
+         class="absolute -top-3 right-2 hidden group-hover:flex ...">
+      <button phx-click="edit_block"      phx-value-id={block.id}>✎  pencil</button>
+      <button phx-click="translate_block" phx-value-id={block.id}>🌐 translate</button>
+    </div>
+  </div>
+
+  # The click records which block + which tool; the re-render hides the toolbar
+  # (editing? is now true) and mounts the `prose` island overlay in its place.
+  def handle_event("edit_block", %{"id" => id}, socket), do: {:noreply, open(socket, id, "edit")}
+
+  defp open(socket, id, mode) do
+    # Re-check admin on the SERVER — the toggle + CSS are only UX; this is the boundary.
+    if socket.assigns.admin and Content.get(socket.assigns.blocks, id),
+      do: assign(socket, editing: %{id: id, mode: mode}),
+      else: socket
+  end
+  """
+
   def mount(_params, session, socket) do
     # Seed from the session so persisted edits survive a reload (see the module
     # doc + InlineEditController); a fresh session just gets the defaults.
@@ -59,7 +85,8 @@ defmodule ExampleWeb.InlineEditLive do
        admin: false,
        editing: nil,
        editor_snippet: @editor_snippet,
-       host_snippet: @host_snippet
+       host_snippet: @host_snippet,
+       toolbar_snippet: @toolbar_snippet
      )}
   end
 
@@ -220,6 +247,71 @@ defmodule ExampleWeb.InlineEditLive do
             components — a TipTap editor and a translator — chosen by a <code>mode</code>
             prop. When you save, the island pushes the new HTML back over <code>live</code>, LiveView updates the block and unmounts the overlay.
           </p>
+        </section>
+
+        <%!-- How the floating toolbar works --%>
+        <section>
+          <div class="flex items-center gap-2">
+            <.icon name="hero-cursor-arrow-rays" class="size-6 text-primary" />
+            <h2 class="text-lg font-semibold">The floating toolbar</h2>
+          </div>
+          <p class="mt-3 text-base-content/70">
+            The pencil/translate chip over each block is <strong>pure LiveView + CSS</strong>
+            — no JavaScript, no island. Three independent decisions govern it:
+          </p>
+
+          <div class="grid gap-4 md:grid-cols-3 mt-4">
+            <div class="card bg-base-100 border border-base-300 rounded-xl p-5">
+              <div class="flex items-center gap-2">
+                <.icon name="hero-server" class="size-4 text-primary" />
+                <span class="text-sm font-semibold">Existence — server</span>
+              </div>
+              <p class="text-sm text-base-content/70 mt-2">
+                An <code>:if</code>
+                guard on <code>@admin</code>
+                (and "not editing this block") means LiveView only writes the toolbar into the HTML
+                when admin is on. In read mode it isn't in the DOM at all.
+              </p>
+            </div>
+
+            <div class="card bg-base-100 border border-base-300 rounded-xl p-5">
+              <div class="flex items-center gap-2">
+                <.icon name="hero-eye" class="size-4 text-primary" />
+                <span class="text-sm font-semibold">Appearance — CSS</span>
+              </div>
+              <p class="text-sm text-base-content/70 mt-2">
+                Even when it exists it's <code>hidden</code>
+                until you hover the block. The wrapper is a Tailwind <code>group</code>, so
+                <code>group-hover:flex</code>
+                reveals the chip on hover — no server round-trip.
+              </p>
+            </div>
+
+            <div class="card bg-base-100 border border-base-300 rounded-xl p-5">
+              <div class="flex items-center gap-2">
+                <.icon name="hero-bolt" class="size-4 text-primary" />
+                <span class="text-sm font-semibold">Action — phx-click</span>
+              </div>
+              <p class="text-sm text-base-content/70 mt-2">
+                Each button carries <code>phx-click</code>
+                (<code>edit_block</code> or <code>translate_block</code>) plus <code>phx-value-id</code>, so the click sends
+                the event and the block id back to LiveView.
+              </p>
+            </div>
+          </div>
+
+          <p class="mt-4 text-base-content/70">
+            The handler records <em>which</em>
+            block and <em>which</em>
+            tool in <code>@editing</code>. That re-render hides the toolbar (<code>editing?</code> is now true) and mounts the
+            <code>prose</code>
+            island overlay in its place — the editor or the translator, picked by <code>mode</code>.
+            Crucially <code>open/3</code>
+            <strong>re-checks <code>admin</code> on the server</strong>: the toggle and the CSS are
+            only UX, the event handler is the real boundary.
+          </p>
+
+          <pre class="mt-3 bg-base-300/50 rounded-lg p-3 overflow-x-auto text-[0.72rem] leading-relaxed"><code>{@toolbar_snippet}</code></pre>
         </section>
 
         <section>
