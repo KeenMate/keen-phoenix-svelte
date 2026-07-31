@@ -59,6 +59,10 @@ defmodule Example.MixProject do
       {:telemetry_poller, "~> 1.0"},
       {:gettext, "~> 1.0"},
       {:jason, "~> 1.2"},
+      # Server-side HTML sanitizer for the inline-edit demo — rich text from the
+      # editor is untrusted (a client can POST any HTML), so it's cleaned before
+      # being stored and rendered with raw/@html.
+      {:html_sanitize_ex, "~> 1.4"},
       {:dns_cluster, "~> 0.2.0"},
       {:bandit, "~> 1.5"},
       {:keen_phoenix_svelte, path: "../keen_phoenix_svelte"}

@@ -77,7 +77,12 @@ defmodule ExampleWeb.Layouts do
                   class="flex items-center rounded-lg p-1.5 hover:bg-base-200"
                   title={I18n.t(@locale, "shell.github")}
                 >
-                  <svg viewBox="0 0 16 16" fill="currentColor" class="size-5 opacity-70" aria-hidden="true">
+                  <svg
+                    viewBox="0 0 16 16"
+                    fill="currentColor"
+                    class="size-5 opacity-70"
+                    aria-hidden="true"
+                  >
                     <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z" />
                   </svg>
                   <span class="sr-only">GitHub</span>
@@ -101,9 +106,17 @@ defmodule ExampleWeb.Layouts do
           </div>
 
           <div class="drawer-side z-30">
-            <label for="nav-drawer" class="drawer-overlay" aria-label={I18n.t(@locale, "shell.closeMenu")}></label>
+            <label
+              for="nav-drawer"
+              class="drawer-overlay"
+              aria-label={I18n.t(@locale, "shell.closeMenu")}
+            >
+            </label>
             <aside class="w-60 min-h-screen bg-base-100 border-r border-base-300 flex flex-col">
-              <.link navigate={~p"/"} class="h-14 px-4 flex items-center gap-2 border-b border-base-300">
+              <.link
+                navigate={~p"/"}
+                class="h-14 px-4 flex items-center gap-2 border-b border-base-300"
+              >
                 <span class="text-primary text-xl leading-none">◆</span>
                 <span class="font-bold tracking-tight">KeenSpace</span>
               </.link>
@@ -170,6 +183,12 @@ defmodule ExampleWeb.Layouts do
                   label={I18n.t(@locale, "nav.widgets")}
                 />
                 <.nav_item
+                  navigate={~p"/inline-edit"}
+                  active={@active == :inline_edit}
+                  icon="hero-pencil-square"
+                  label={I18n.t(@locale, "nav.inline_edit")}
+                />
+                <.nav_item
                   navigate={~p"/docs"}
                   active={@active == :docs}
                   icon="hero-book-open"
@@ -225,6 +244,7 @@ defmodule ExampleWeb.Layouts do
   defp header_title(locale, :eager, _title), do: I18n.t(locale, "nav.eager")
   defp header_title(locale, :stress, _title), do: I18n.t(locale, "nav.stress")
   defp header_title(locale, :widgets, _title), do: I18n.t(locale, "nav.widgets")
+  defp header_title(locale, :inline_edit, _title), do: I18n.t(locale, "nav.inline_edit")
 
   defp header_title(_locale, _active, title), do: title || ""
 

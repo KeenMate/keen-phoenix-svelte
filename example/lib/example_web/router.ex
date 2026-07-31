@@ -47,6 +47,7 @@ defmodule ExampleWeb.Router do
       live "/eager", EagerLive, :index
       live "/stress", StressLive, :index
       live "/widgets", WidgetsLive, :index
+      live "/inline-edit", InlineEditLive, :index
       live "/docs", DocsLive, :index
     end
 
@@ -63,6 +64,8 @@ defmodule ExampleWeb.Router do
     post "/session/switch", SessionController, :switch
     # Language switch — stores the locale in the session.
     post "/session/locale", SessionController, :locale
+    # Clears persisted inline-edit blocks from the session (see /inline-edit).
+    post "/inline-edit/reset", InlineEditController, :reset
   end
 
   scope "/api", ExampleWeb do
@@ -71,6 +74,9 @@ defmodule ExampleWeb.Router do
     get "/videos", VideoController, :index
     get "/videos/:id", VideoController, :show
     post "/videos/:id/save", VideoController, :save
+
+    # Persists an inline-edit block into the session so edits survive a reload.
+    post "/inline-edit/blocks", InlineEditController, :save
   end
 
   scope "/api/maintenance", ExampleWeb do

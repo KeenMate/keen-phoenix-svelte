@@ -143,6 +143,16 @@ defmodule ExampleWeb.HomeLive do
               <p class="text-sm text-base-content/70">{b.desc}</p>
             </div>
           </div>
+
+          <p class="mt-4 text-sm text-base-content/50">
+            <code>live</code>
+            runs both ways:
+            <.link navigate={~p"/inline-edit"} class="link link-primary">Inline edit</.link>
+            renders a floating toolbar in LiveView, mounts a TipTap editor island over a text block on
+            demand, and the island pushes the edited HTML <em>back</em>
+            over <code>live</code>
+            to save.
+          </p>
         </section>
 
         <%!-- Any framework — same boundary --%>
@@ -209,7 +219,8 @@ defmodule ExampleWeb.HomeLive do
 
           <p class="text-sm mt-4">
             <.link navigate={~p"/docs"} class="link link-primary inline-flex items-center gap-1">
-              See the adapter each framework needs <.icon name="hero-arrow-right-micro" class="size-4" />
+              See the adapter each framework needs
+              <.icon name="hero-arrow-right-micro" class="size-4" />
             </.link>
           </p>
         </section>

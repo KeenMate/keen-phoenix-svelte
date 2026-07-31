@@ -13,13 +13,30 @@ defmodule ExampleWeb.DocsLive do
   # The one object every island's entry receives — the whole coupling to Phoenix.
   @boundary [
     %{name: "target", desc: "The element to mount into. You own everything inside it."},
-    %{name: "props", desc: "Small per-island config from <.app props={…}> — config, not payload."},
-    %{name: "context", desc: "Page-wide user, CSRF, tokens, api_base and socket — emitted once per page."},
-    %{name: "live", desc: "The LiveView bridge: pushEvent / handleEvent / upload. null on plain pages (and initially on an eager mount)."},
-    %{name: "liveStatus", desc: "\"ready\" | \"pending\" | \"none\" — whether live is here now, coming on connect (eager), or never (plain page)."},
+    %{
+      name: "props",
+      desc: "Small per-island config from <.app props={…}> — config, not payload."
+    },
+    %{
+      name: "context",
+      desc: "Page-wide user, CSRF, tokens, api_base and socket — emitted once per page."
+    },
+    %{
+      name: "live",
+      desc:
+        "The LiveView bridge: pushEvent / handleEvent / upload. null on plain pages (and initially on an eager mount)."
+    },
+    %{
+      name: "liveStatus",
+      desc:
+        "\"ready\" | \"pending\" | \"none\" — whether live is here now, coming on connect (eager), or never (plain page)."
+    },
     %{name: "api", desc: "REST helper; attaches x-csrf-token + the session cookie."},
     %{name: "channel", desc: "Promise-based Phoenix channel factory with auto cid correlation."},
-    %{name: "bus", desc: "Page-wide client-side event bus for island-to-island messaging — no server."}
+    %{
+      name: "bus",
+      desc: "Page-wide client-side event bus for island-to-island messaging — no server."
+    }
   ]
 
   # One adapter per framework. `code` is the real `assets/apps/<name>/js/main.js`
@@ -226,7 +243,11 @@ defmodule ExampleWeb.DocsLive do
     %{k: "Manifest URL", direct: "the CDN URL", proxy: "/apps/<name> (same-origin)"},
     %{k: "CORS", direct: "required on the CDN", proxy: "none"},
     %{k: "CSP script-src", direct: "must allow the CDN", proxy: "'self'"},
-    %{k: "Auth / gating / SRI", direct: "hard (public, cross-origin)", proxy: "easy (you serve it)"},
+    %{
+      k: "Auth / gating / SRI",
+      direct: "hard (public, cross-origin)",
+      proxy: "easy (you serve it)"
+    },
     %{k: "Server load", direct: "none (CDN edge)", proxy: "in path, cached + revalidated (ETS)"}
   ]
 
@@ -285,7 +306,7 @@ defmodule ExampleWeb.DocsLive do
           <h1 class="text-3xl font-bold tracking-tight mt-3">How it works</h1>
           <p class="mt-3 text-base-content/70">
             A pocket guide to the two questions the demo raises: <strong>what do I write in each
-            framework</strong>
+              framework</strong>
             to make an island, and <strong>how does the app proxy work</strong>?
             The full guides live in
             <a
@@ -293,7 +314,9 @@ defmodule ExampleWeb.DocsLive do
               target="_blank"
               rel="noopener noreferrer"
               class="link link-primary"
-            >the HexDocs</a>
+            >
+              the HexDocs
+            </a>
             and in <code>keen_phoenix_svelte/docs/</code>.
           </p>
         </section>
@@ -306,10 +329,13 @@ defmodule ExampleWeb.DocsLive do
           </div>
           <p class="mt-2 text-base-content/70">
             One question decides whether a bundle can be an island at all:
-            <strong>was it built to mount into a container you hand it, or to be the whole page?</strong>
+            <strong>
+              was it built to mount into a container you hand it, or to be the whole page?
+            </strong>
             It's <em>not</em>
             about size, richness, or being a "SPA" — a full file-management applet in the middle of
-            a page is a perfect island. It's a <strong>packaging</strong> decision.
+            a page is a perfect island. It's a <strong>packaging</strong>
+            decision.
           </p>
 
           <div class="grid gap-4 md:grid-cols-2 mt-5">
@@ -325,7 +351,8 @@ defmodule ExampleWeb.DocsLive do
             </div>
             <div class="rounded-lg border border-base-300 p-4">
               <p class="font-semibold text-sm flex items-center gap-1.5">
-                <.icon name="hero-x-circle" class="size-4 text-base-content/40" /> Page-owning (must iframe)
+                <.icon name="hero-x-circle" class="size-4 text-base-content/40" />
+                Page-owning (must iframe)
               </p>
               <ul class="mt-2 space-y-1.5 text-sm text-base-content/70">
                 <li :for={s <- @page_owner_signs} class="flex gap-2">
@@ -339,9 +366,7 @@ defmodule ExampleWeb.DocsLive do
             If you control the build, make it island-able (the checklist above is a <strong>library
             build</strong>, not an app build). If you can't — or it's a whole app, not a component —
             <strong>embed it in an iframe</strong>
-            instead; it just won't get the in-process boundary (config + messaging go over
-            <code>postMessage</code>). Full guide:
-            <a
+            instead; it just won't get the in-process boundary (config + messaging go over <code>postMessage</code>). Full guide: <a
               href="https://hexdocs.pm/keen_phoenix_svelte/packaging-apps.html"
               target="_blank"
               rel="noopener noreferrer"
@@ -391,8 +416,7 @@ defmodule ExampleWeb.DocsLive do
         <section>
           <h2 class="text-xl font-semibold">3 · Talking to the server (websockets)</h2>
           <p class="text-base-content/60 mt-1">
-            Two of the boundary pieces ride a websocket. Pick by lifetime:
-            <code>live</code>
+            Two of the boundary pieces ride a websocket. Pick by lifetime: <code>live</code>
             piggybacks on the LiveView's own socket for request/reply tied to the page;
             <code>channel</code>
             opens a <strong>dedicated topic</strong>
@@ -450,8 +474,7 @@ defmodule ExampleWeb.DocsLive do
                 <p class="text-sm text-base-content/70">
                   A promise-based wrapper over a Phoenix channel. The socket connects lazily from
                   <code>context.socket_path</code>
-                  + <code>context.socket_token</code>, so it needs no LiveView.
-                  <code>push()</code>
+                  + <code>context.socket_token</code>, so it needs no LiveView. <code>push()</code>
                   is <strong>envelope-agnostic</strong>
                   — it resolves with the raw reply (you read <code>reply.data</code>
                   / <code>reply.error</code>) and auto-attaches a <code>cid</code>
@@ -477,8 +500,11 @@ defmodule ExampleWeb.DocsLive do
             The <.link navigate={~p"/chat"} class="link link-primary">Chat</.link>
             island runs on <code>channel</code>
             + Presence; <.link navigate={~p"/videos"} class="link link-primary">Videos</.link>
-            uses the <code>live</code>/<code>api</code>
-            fallback pair above. <code>keen_phoenix_svelte</code>
+            uses the <code>live</code>/<code>api</code> fallback pair above;
+            <.link navigate={~p"/inline-edit"} class="link link-primary">Inline edit</.link>
+            drives <code>live</code>
+            the other way — an autonomous editor island pushing edits <em>back</em>
+            to its host LiveView, which owns persistence. <code>keen_phoenix_svelte</code>
             provides only the client — it doesn't depend on any particular channel framework.
           </p>
         </section>
@@ -514,8 +540,7 @@ defmodule ExampleWeb.DocsLive do
           <p class="text-sm text-base-content/50 mt-4">
             No central registration — the builder discovers <code>assets/apps/*</code>
             automatically and each builds to <code>priv/static/apps/&lt;name&gt;/main.mjs</code>,
-            a self-contained ES module with its CSS injected by JS. The hook
-            <code>import()</code>s it on demand, so a page only fetches the islands it shows.
+            a self-contained ES module with its CSS injected by JS. The hook <code>import()</code>s it on demand, so a page only fetches the islands it shows.
           </p>
         </section>
 
@@ -543,7 +568,8 @@ defmodule ExampleWeb.DocsLive do
         <section>
           <h2 class="text-xl font-semibold">6 · When it mounts (eager vs default)</h2>
           <p class="text-base-content/60 mt-1">
-            On a LiveView the first HTTP response is a <strong>full server render</strong> — you
+            On a LiveView the first HTTP response is a <strong>full server render</strong>
+            — you
             see the page and the island's <em>placeholder</em>
             right away. But the island's JS only mounts when the <code>KeenApp</code>
             hook runs, and the hook can't run until the <strong>socket connects</strong>. On a
@@ -601,10 +627,10 @@ defmodule ExampleWeb.DocsLive do
           <p class="text-base-content/60 mt-4">
             Consuming it is optional — read <code>liveStatus</code>, and if it's
             <code>"pending"</code>
-            wait for the event before touching <code>live</code>. Server-pushed
-            <em>prop</em>
+            wait for the event before touching <code>live</code>. Server-pushed <em>prop</em>
             changes (<code>setProps</code>) keep working the whole time; only the imperative
-            <code>live.*</code> calls need the bridge.
+            <code>live.*</code>
+            calls need the bridge.
           </p>
           <pre class="mt-3 bg-base-300/50 rounded-lg p-3 overflow-x-auto text-xs leading-relaxed"><code>{@eager_client}</code></pre>
 
@@ -613,8 +639,7 @@ defmodule ExampleWeb.DocsLive do
             page mounts the same island both ways side by side, timed — watch the eager copy paint
             first and turn "live" a moment later. The
             <.link navigate={~p"/proxying"} class="link link-primary">Proxying</.link>
-            (LiveView) vs
-            <a href="/proxying-plain" class="link link-primary">Proxying (plain)</a>
+            (LiveView) vs <a href="/proxying-plain" class="link link-primary">Proxying (plain)</a>
             pages show the same gap between a LiveView mount and a plain-page mount.
           </p>
         </section>
@@ -660,21 +685,27 @@ defmodule ExampleWeb.DocsLive do
             <code>:proxy</code>
             is the corporate-friendly mode: it turns a cross-origin bundle into a first-party
             asset, sidestepping CORS and a strict CSP. Phoenix fetches the upstream, caches it in
-            ETS, and re-serves it same-origin. A stale entry is <em>revalidated</em> with a
-            single-flight conditional <code>GET</code> (<code>If-None-Match</code>), driven by the
+            ETS, and re-serves it same-origin. A stale entry is <em>revalidated</em>
+            with a
+            single-flight conditional <code>GET</code>
+            (<code>If-None-Match</code>), driven by the
             upstream's <code>Cache-Control</code>/<code>ETag</code> with a <code>:ttl</code>
-            fallback — so even an unversioned <code>…/app.js</code> is re-checked, not pinned. The
+            fallback — so even an unversioned <code>…/app.js</code>
+            is re-checked, not pinned. The
             <.link navigate={~p"/proxying"} class="link link-primary">Proxying</.link>
             page shows both modes against a real external CDN — <code>metrics</code>
             (multi-file) over <code>:proxy</code>, <code>hello</code>
-            (single-file) over <code>:direct</code> — side by side.
+            (single-file) over <code>:direct</code>
+            — side by side.
           </p>
 
           <pre class="mt-3 bg-base-300/50 rounded-lg p-3 overflow-x-auto text-xs"><code>{@proxy_config}</code></pre>
 
           <p class="text-sm text-base-content/50 mt-3">
-            A versioned CDN URL (<code>…/org-chart@1.4.2/…</code>) can set <code>immutable: true</code>
-            to skip revalidation; anything else is re-checked on the <code>:ttl</code> cadence, so it
+            A versioned CDN URL (<code>…/org-chart@1.4.2/…</code>) can set
+            <code>immutable: true</code>
+            to skip revalidation; anything else is re-checked on the <code>:ttl</code>
+            cadence, so it
             never goes stale. The registry is just data: build the same map from a database at runtime
             with <code>Application.put_env/3</code>; it's read per request.
           </p>
