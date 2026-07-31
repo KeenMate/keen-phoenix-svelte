@@ -47,21 +47,28 @@ defmodule ExampleWeb.InlineEditLive do
   """
 
   @toolbar_snippet """
-  # inline_edit_live.ex — the toolbar is HEEx + CSS, no JavaScript.
-  <div :for={block <- @blocks} class="group relative ...">   # relative anchors it; group enables hover
+  # inline_edit_live.ex — toolbar + island are two mutually-exclusive siblings.
+  <div :for={block <- @blocks} class="group relative ...">   # relative anchors both; group enables hover
     <div class="prose ...">{raw(block.html)}</div>
 
-    # Existence: rendered only when admin is on and this block isn't already open.
-    # Appearance: `hidden group-hover:flex` reveals it on hover — pure CSS.
+    # 1. The toolbar — shown when admin is on and this block ISN'T being edited.
+    #    `hidden group-hover:flex` reveals it on hover (pure CSS, no round-trip).
     <div :if={@admin and not editing?(@editing, block.id)}
          class="absolute -top-3 right-2 hidden group-hover:flex ...">
       <button phx-click="edit_block"      phx-value-id={block.id}>✎  pencil</button>
       <button phx-click="translate_block" phx-value-id={block.id}>🌐 translate</button>
     </div>
+
+    # 2. The island — mounted only WHILE this block is edited (the mirror guard).
+    #    <.app> is the mount point; a LOCAL app needs no registration — the
+    #    builder discovers apps/prose/ and serves /apps/prose/main.mjs.
+    <div :if={editing?(@editing, block.id)} class="absolute inset-x-0 -top-2 z-20">
+      <.app name="prose" id={"prose-\#{block.id}-\#{@editing.mode}"}
+        props={%{block: block, mode: @editing.mode, languages: Content.languages()}} />
+    </div>
   </div>
 
-  # The click records which block + which tool; the re-render hides the toolbar
-  # (editing? is now true) and mounts the `prose` island overlay in its place.
+  # The click flips @editing, which swaps sibling 1 (toolbar) for sibling 2 (island).
   def handle_event("edit_block", %{"id" => id}, socket), do: {:noreply, open(socket, id, "edit")}
 
   defp open(socket, id, mode) do
@@ -306,6 +313,11 @@ defmodule ExampleWeb.InlineEditLive do
             tool in <code>@editing</code>. That re-render hides the toolbar (<code>editing?</code> is now true) and mounts the
             <code>prose</code>
             island overlay in its place — the editor or the translator, picked by <code>mode</code>.
+            That overlay is just a sibling <code>&lt;.app name="prose"&gt;</code>
+            — <strong>no registration</strong>: the builder auto-discovers local apps under
+            <code>assets/apps/</code>
+            and serves <code>/apps/prose/main.mjs</code>
+            (config-based registration is only for external/CDN bundles).
             Crucially <code>open/3</code>
             <strong>re-checks <code>admin</code> on the server</strong>: the toggle and the CSS are
             only UX, the event handler is the real boundary.
